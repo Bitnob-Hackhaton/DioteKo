@@ -1,0 +1,2 @@
+- [backend-nest migration stack](project_backend_nest_stack.md) — backend-nest/ uses TypeORM 0.3.x two-way migrations; fresh DB, no data migration
+- [Schema rationale docs](reference_schema_docs.md) — DECISIONS.md / KNOWN_ISSUES.md / SCHEMA.md hold the "why" behind backend-nest schema + FK choices

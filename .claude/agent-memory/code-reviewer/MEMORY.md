@@ -1,0 +1,2 @@
+- [backend-nest migration status](project_backend_nest_migration.md) — NestJS backend is the running backend, delivered in numbered "Increments"; money-movement code lands here
+- [Review-gate convention](project_review_gate_convention.md) — security-analyst (M#) + migration-reviewer (A#) run before code-reviewer; their condition IDs are cited in code comments
