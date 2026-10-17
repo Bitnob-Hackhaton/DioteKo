@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env*
+!.env.example
+!.env.test.example
+!.env.prod.example
+*.log
+.DS_Store
+
+# TypeORM CLI / ts-node cache
+*.tsbuildinfo
+
+# Throwaway probe scripts (underscore-prefixed, never committed)
+scripts/_*.ts
+
+# Subagent memory lives in the repo-root .claude/agent-memory/, not here
+# (agents run with cwd=backend-nest and would otherwise fork a second tree)
+.claude/

@@ -1,0 +1,14 @@
+node_modules
+dist
+# All local env files — never bake secrets into image layers. The container
+# gets its config from `env_file:` / `environment:` in the compose file at run
+# time, not from a copied file. (.env.example etc. are harmless but pointless
+# in the image.)
+.env
+.env.*
+.git
+.gitignore
+README.md
+test
+*.log
+.DS_Store
