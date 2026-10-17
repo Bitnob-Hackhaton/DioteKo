@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# Root infra env files (docker compose --env-file) — hold local secrets.
+# The *.example templates ARE committed.
+.env.dev
+.env.test
+.env.prod
+!.env.dev.example
+!.env.prod.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build outputs
+dist/
+build/
+*.log
+
+# OS
+Thumbs.db
+#Ignore directory mobile
+mobile/
+# Local credentials notes: never commit
+docs/APPWRITE_ID.md
+
+# Real identity photos used for manual KYC tests: never commit
+TestKYC/
