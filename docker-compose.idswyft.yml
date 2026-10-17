@@ -1,0 +1,133 @@
+# -----------------------------------------------------------------------------
+# Idswyft (self-hosted identity verification / KYC) — DEV ONLY. Included by
+# docker-compose.dev.yml, so it starts with `npm run dev:up` and shares the
+# `dioteko-dev` project's default network: backend-nest reaches the API in-network
+# at http://idswyft-api:3001 (IDSWYFT_BASE_URL is overridden for the container).
+#
+# Self-contained, like Appwrite: it brings its own PostgreSQL, ML engine and
+# migrations and never touches DioteKo's Postgres (`postgres` service) nor any
+# container, network or volume of another project. Nothing outside this repository
+# is needed.
+#
+# Images are BUILT from the open-source repository, pinned to a release tag so
+# every teammate runs the same code (first build downloads the sources and takes a
+# few minutes). Facts checked against that tag's sources on 2026-10-16: the ML
+# engine listens on 3002 and is configured by ENGINE_URL (not ML_ENGINE_URL); the API
+# image does not contain its SQL migrations; STORAGE_PROVIDER defaults to a hosted
+# service, so `local` is set here and uploads live in a volume; the dashboard is a
+# Vite/nginx app whose proxy targets the host name `api`.
+#
+# One-time setup after first boot (API key): `npm run kyc:bootstrap`, see docs/KYC.md
+# and docs/DEV_WORKFLOW.md "Idswyft". Stop just this stack:
+#   docker compose -p dioteko-dev stop idswyft-api idswyft-dashboard idswyft-ml-engine idswyft-postgres
+#
+# Values come from the repo-root .env.dev (docker compose --env-file .env.dev,
+# wired in by scripts/docker-dev-up.js); every one has a safe dev default.
+# The three secrets below are dev placeholders: API_KEY_SECRET must never change
+# once keys exist (it hashes them), ENCRYPTION_KEY protects stored webhook secrets.
+# -----------------------------------------------------------------------------
+x-idswyft-source: &idswyft-source "https://github.com/team-idswyft/idswyft-community.git#${IDSWYFT_VERSION:-v1.12.19}"
+
+services:
+  idswyft-postgres:
+    image: postgres:16-alpine
+    container_name: dioteko-idswyft-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${IDSWYFT_DB_USER:-idswyft}
+      POSTGRES_PASSWORD: ${IDSWYFT_DB_PASSWORD:-idswyft_dev_password}
+      POSTGRES_DB: idswyft
+    volumes:
+      - idswyft_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IDSWYFT_DB_USER:-idswyft} -d idswyft"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # One-shot: copies the SQL migrations of the pinned release into the shared volume, then exits.
+  idswyft-migrations:
+    build:
+      context: ./docker/idswyft
+      dockerfile: migrations.Dockerfile
+      args:
+        IDSWYFT_VERSION: ${IDSWYFT_VERSION:-v1.12.19}
+    image: dioteko-idswyft-migrations:${IDSWYFT_VERSION:-v1.12.19}
+    container_name: dioteko-idswyft-migrations
+    restart: "no"
+    volumes:
+      - idswyft_migrations:/shared
+
+  # Upstream engine + the DioteKo overlay (docker/idswyft/README.md): ECOWAS card reader and an orientation score that no
+  # longer prefers a garbled upside-down read. The upstream sources are the named build context `upstream`.
+  idswyft-ml-engine:
+    build:
+      context: ./docker/idswyft
+      dockerfile: engine.Dockerfile
+      additional_contexts:
+        upstream: *idswyft-source
+    image: dioteko-idswyft-ml-engine:${IDSWYFT_VERSION:-v1.12.19}-dioteko
+    container_name: dioteko-idswyft-ml
+    restart: unless-stopped
+    environment:
+      PORT: "3002"
+      NODE_ENV: development
+
+  idswyft-api:
+    build:
+      context: *idswyft-source
+      dockerfile: backend/Dockerfile
+    image: dioteko-idswyft-api:${IDSWYFT_VERSION:-v1.12.19}
+    container_name: dioteko-idswyft-api
+    restart: unless-stopped
+    depends_on:
+      idswyft-postgres:
+        condition: service_healthy
+      idswyft-migrations:
+        condition: service_completed_successfully
+      idswyft-ml-engine:
+        condition: service_started
+    networks:
+      default:
+        aliases:
+          # The dashboard's nginx proxies /api to the host name `api` (hard-coded upstream).
+          - api
+    ports:
+      # Host 8000 -> container 3001. API: http://localhost:8000 (docs: /api/docs).
+      - "${IDSWYFT_API_HOST_PORT:-8000}:3001"
+    environment:
+      DATABASE_URL: postgresql://${IDSWYFT_DB_USER:-idswyft}:${IDSWYFT_DB_PASSWORD:-idswyft_dev_password}@idswyft-postgres:5432/idswyft
+      # The migration script turns TLS on for any host that is not literally `postgres`/`localhost`.
+      DATABASE_SSL: "false"
+      MIGRATIONS_DIR: /app/migrations
+      MIGRATIONS_LENIENT: "true"
+      ENGINE_URL: http://idswyft-ml-engine:3002
+      # Default is a hosted storage service; keep the uploaded photos in a local volume instead.
+      STORAGE_PROVIDER: local
+      JWT_SECRET: ${IDSWYFT_JWT_SECRET:-dev-only-change-me-min-32-characters-long}
+      API_KEY_SECRET: ${IDSWYFT_API_KEY_SECRET:-dev-only-api-key-secret-min-32-characters}
+      ENCRYPTION_KEY: ${IDSWYFT_ENCRYPTION_KEY:-dev-only-encryption-key-min-32-characters-long}
+      SERVICE_TOKEN: ${IDSWYFT_SERVICE_TOKEN:-dev-only-service-token-min-32-characters-long}
+      CORS_ORIGINS: http://localhost:${IDSWYFT_DASHBOARD_HOST_PORT:-8086}
+    volumes:
+      - idswyft_migrations:/app/migrations:ro
+      - idswyft_uploads:/app/backend/uploads
+      - idswyft_temp:/app/backend/temp
+
+  idswyft-dashboard:
+    build:
+      context: https://github.com/team-idswyft/idswyft-community.git#${IDSWYFT_VERSION:-v1.12.19}:frontend
+    image: dioteko-idswyft-dashboard:${IDSWYFT_VERSION:-v1.12.19}
+    container_name: dioteko-idswyft-dashboard
+    restart: unless-stopped
+    depends_on:
+      - idswyft-api
+    ports:
+      # Host 8086 -> container 8080. Dashboard: http://localhost:8086
+      - "${IDSWYFT_DASHBOARD_HOST_PORT:-8086}:8080"
+
+volumes:
+  idswyft_pg_data:
+  idswyft_migrations:
+  idswyft_uploads:
+  idswyft_temp:

@@ -1,0 +1,4 @@
+# Par défaut → stack dev
+# Production : docker compose -f docker-compose.prod.yml up -d
+include:
+  - docker-compose.dev.yml

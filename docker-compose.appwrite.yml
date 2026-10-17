@@ -1,0 +1,95 @@
+# -----------------------------------------------------------------------------
+# Appwrite (self-hosted) — DEV ONLY. Included by docker-compose.dev.yml, so it
+# starts with `npm run dev:up` and shares the `dioteko-dev` project's default
+# network (backend-nest reaches it at http://appwrite/v1 in-network).
+#
+# Appwrite has no Postgres adapter — it brings its own MariaDB + Redis. These
+# never touch DioteKo's Postgres (`postgres` service in docker-compose.dev.yml).
+#
+# One-time setup after first boot: docs/DEV_WORKFLOW.md "Appwrite first-run".
+# Stop just this stack:  docker compose -p dioteko-dev stop appwrite appwrite-mariadb appwrite-redis
+#
+# Values come from the repo-root .env.dev (docker compose --env-file .env.dev,
+# wired in by scripts/docker-dev-up.js); every one has a safe dev default.
+# -----------------------------------------------------------------------------
+services:
+  appwrite:
+    image: appwrite/appwrite:1.5.4
+    container_name: dioteko-appwrite
+    restart: unless-stopped
+    depends_on:
+      - appwrite-mariadb
+      - appwrite-redis
+    ports:
+      # Host 8090 -> container 80 (avoids the 80/443 clash with other stacks).
+      - "${APPWRITE_HTTP_PORT:-8090}:80"
+    environment:
+      _APP_ENV: development
+      _APP_LOCALE: en
+      # Must be defined (even empty): unset -> null -> TypeError in Request::getHeader() (HTTP 500 on every request).
+      _APP_SYSTEM_RESPONSE_FORMAT: ""
+      _APP_OPTIONS_ABUSE: disabled
+      _APP_OPTIONS_FORCE_HTTPS: disabled
+      _APP_OPTIONS_ROUTER_PROTECTION: disabled
+      _APP_DOMAIN: localhost
+      _APP_DOMAIN_TARGET: localhost
+      _APP_DOMAIN_FUNCTIONS: functions.localhost
+      _APP_CONSOLE_WHITELIST_ROOT: disabled
+      # Must be defined: unset -> limit 0 -> every bucket create/update fails with
+      # "Invalid `maximumFileSize` param: Value must be a valid range between 1 and 0" (HTTP 400).
+      _APP_STORAGE_LIMIT: "${APPWRITE_STORAGE_LIMIT:-30000000}"
+      _APP_STORAGE_PREVIEW_LIMIT: "20000000"
+      _APP_KEY: ${APPWRITE_KEY:-dev-only-change-me-min-32-characters-long}
+      _APP_OPENSSL_KEY_V1: ${APPWRITE_OPENSSL_KEY_V1:-dev-only-change-me-min-32-characters-long}
+      _APP_DB_ADAPTER: mariadb
+      _APP_DB_HOST: appwrite-mariadb
+      _APP_DB_PORT: "3306"
+      _APP_DB_SCHEMA: appwrite
+      _APP_DB_USER: appwrite
+      _APP_DB_PASS: ${APPWRITE_DB_PASS:-appwrite}
+      _APP_REDIS_HOST: appwrite-redis
+      _APP_REDIS_PORT: "6379"
+      _APP_SYSTEM_EMAIL_NAME: DioteKo Dev
+      _APP_SYSTEM_EMAIL_ADDRESS: no-reply@dioteko.local
+    volumes:
+      - appwrite_uploads:/storage/uploads
+      - appwrite_cache:/storage/cache
+      - appwrite_config:/storage/config
+      - appwrite_certificates:/storage/certificates
+      - appwrite_functions:/storage/functions
+
+  appwrite-mariadb:
+    image: mariadb:10.11
+    container_name: dioteko-appwrite-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: appwrite
+      MYSQL_USER: appwrite
+      MYSQL_PASSWORD: ${APPWRITE_DB_PASS:-appwrite}
+      MYSQL_ROOT_PASSWORD: ${APPWRITE_DB_ROOT_PASS:-appwrite_root}
+    ports:
+      # Host 3310 -> container 3306 (avoids the 3306 clash with other stacks).
+      - "3310:3306"
+    command: >
+      --innodb-flush-method=fsync
+    volumes:
+      - appwrite_mariadb_data:/var/lib/mysql
+
+  appwrite-redis:
+    image: redis:7.2-alpine
+    container_name: dioteko-appwrite-redis
+    restart: unless-stopped
+    volumes:
+      - appwrite_redis_data:/data
+    ports:
+      # Host 6389 -> container 6379 (avoids the 6379 clash with other stacks).
+      - "6389:6379"
+
+volumes:
+  appwrite_uploads:
+  appwrite_cache:
+  appwrite_config:
+  appwrite_certificates:
+  appwrite_functions:
+  appwrite_mariadb_data:
+  appwrite_redis_data:

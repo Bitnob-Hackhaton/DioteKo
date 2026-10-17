@@ -1,0 +1,87 @@
+name: dioteko-dev
+
+# Guard: bare `docker compose up` must fail. Only scripts/docker-dev-up.js
+# (`npm run dev:up`) sets DEV_UP_GUARD — it starts the stack, waits for DioteKo's
+# own Postgres, creates the dioteko_dev / dioteko_test databases, and passes
+# `--env-file .env.dev` for the values interpolated below.
+x-dev-up-guard: "${DEV_UP_GUARD:?Use `npm run dev:up`, not `docker compose up` directly — it waits for Postgres, creates the databases and loads .env.dev. See scripts/docker-dev-up.js}"
+
+# Appwrite (self-hosted, dev-only) lives in its own file so it can be disabled
+# by commenting this one line. Values come from .env.dev.
+include:
+  - docker-compose.appwrite.yml
+  # Idswyft (self-hosted KYC) — same idea, own file, own Postgres. Comment this line to disable it.
+  - docker-compose.idswyft.yml
+
+# Self-contained stack: DioteKo owns its Postgres, on this project's own default
+# network. It does not use (or touch) any Postgres container or Docker network
+# from another project, so the repo can be cloned and run on any machine.
+services:
+  # -------------------------------------------------------------------------
+  # THE APP — backend-nest (NestJS + TypeORM). Reaches DioteKo's Postgres by
+  # service name over the project network.
+  # -------------------------------------------------------------------------
+  backend-nest:
+    build:
+      context: ./backend-nest
+      dockerfile: Dockerfile
+    image: dioteko-backend-nest:dev
+    container_name: dioteko-backend-nest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    env_file:
+      # App config (JWT/VC secrets, Bitnob, …). The DB_* + APPWRITE_ENDPOINT
+      # below override whatever this file says, so the container always targets
+      # the in-network Postgres and Appwrite regardless of the host-oriented
+      # values in backend-nest/.env.
+      - ./backend-nest/.env
+    environment:
+      # In-network: service name + container port 5432. The host port below
+      # (DIOTEKO_PG_HOST_PORT) only matters for tools run on the host machine.
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USERNAME: ${POSTGRES_USER:-postgres_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
+      # Fixed name — the E2E guards assert `dioteko_test` literally, so the
+      # dev/test names are not configurable.
+      DB_NAME: dioteko_dev
+      # Talk to the bundled Appwrite over the compose network, not localhost.
+      APPWRITE_ENDPOINT: http://appwrite/v1
+      # Same for Idswyft: the API is reached by service name over the compose network (container port 3001).
+      IDSWYFT_BASE_URL: http://idswyft-api:3001
+      # ML engine of the same stack: lets the backend check a photo before it is sent into a verification session.
+      IDSWYFT_ENGINE_URL: http://idswyft-ml-engine:3002
+
+  # -------------------------------------------------------------------------
+  # DATABASE — DioteKo's own PostgreSQL. POSTGRES_DB creates `dioteko_dev` on
+  # first boot; `npm run dev:up` / `db:setup` create `dioteko_test` (no init
+  # service). The host port is deliberately not 5432/5433/5434 so it does not
+  # clash with Postgres instances other projects usually expose; change it with
+  # DIOTEKO_PG_HOST_PORT in .env.dev, then mirror it in backend-nest/.env(.test).
+  # -------------------------------------------------------------------------
+  postgres:
+    image: postgres:18-alpine
+    container_name: dioteko-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
+      POSTGRES_DB: dioteko_dev
+    ports:
+      - "${DIOTEKO_PG_HOST_PORT:-5435}:5432"
+    volumes:
+      # postgres:18+ keeps its data in a versioned sub-folder of
+      # /var/lib/postgresql, so the volume is mounted there (not on .../data).
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres_user} -d dioteko_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  postgres_data:
