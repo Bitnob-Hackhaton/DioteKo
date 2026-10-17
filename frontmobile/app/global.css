@@ -1,0 +1,43 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+@import "nativewind/theme";
+
+@theme {
+  /* Brand */
+  --color-primary: #19C37D;
+  --color-secondary: #151312;
+  --color-accent: #AB8BFF;
+
+  /* Light palette */
+  --color-light-100: #D6C6FF;
+  --color-light-200: #A8B5DB;
+  --color-light-300: #9CA4AB;
+  --color-light-primary: #00863D;
+  --color-light-text: #11181C;
+  --color-light-background: #DADCE0;
+  --color-light-tint: #E4141E;
+  --color-light-icon: #687076;
+  --color-light-tabIconDefault: #687076;
+
+  /* Dark palette */
+  --color-dark-100: #221f3d;
+  --color-dark-200: #0f0d23;
+  --color-dark-primary: #19C37D;
+  --color-dark-text: #ECEDEE;
+  --color-dark-background: #151718;
+  --color-dark-tint: #00863D;
+  --color-dark-icon: #9BA1A6;
+  --color-dark-tabIconDefault: #9BA1A6;
+
+  /* Fonts (Poppins) */
+  --font-pthin: "Poppins-Thin";
+  --font-pextralight: "Poppins-ExtraLight";
+  --font-plight: "Poppins-Light";
+  --font-pregular: "Poppins-Regular";
+  --font-pmedium: "Poppins-Medium";
+  --font-psemibold: "Poppins-SemiBold";
+  --font-pbold: "Poppins-Bold";
+  --font-pextrabold: "Poppins-ExtraBold";
+  --font-pblack: "Poppins-Black";
+}
