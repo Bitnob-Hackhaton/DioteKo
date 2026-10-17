@@ -1,0 +1,56 @@
+# Arborescence réelle du dépôt (2026-10-15)
+
+Liste des dossiers et fichiers utiles. Les éléments marqués **LEGACY** ne sont pas utilisés par le runtime
+et sont à retirer (voir `docs/ROADMAP_NEXT_STEPS.md` §6).
+
+- `diotekomobile/` (racine du dépôt)
+  - `CLAUDE.md`: workflow générique et roster des subagents
+  - `ARCHITECTURE.md`: vue d'ensemble du système, renvoie à `docs/ARCHITECTURE_AS_BUILT.md` et `docs/DATABASE_MODEL.md`
+  - `README.md`: présentation du projet (FR / EN)
+  - `package.json`: outils dev racine (`dev:up`, `dev:down`, `db:setup`, `db:reset`)
+  - `scripts/`: `docker-dev-up.js`, `db-setup.js`, `db-reset.js`
+  - `docker-compose.yml`: inclut `docker-compose.dev.yml` (stack par défaut)
+  - `docker-compose.dev.yml`: stack dev. PostgreSQL 18 (`dioteko-postgres`, port hôte 5435), `backend-nest`, Appwrite
+  - `docker-compose.appwrite.yml`: Appwrite auto-hébergé (dev), inclus par le fichier dev
+  - `docker-compose.prod.yml`: stack production
+  - `backend-nest/`: **backend actif**, NestJS 11 + TypeORM + PostgreSQL
+    - `src/main.ts`, `src/app.module.ts`: démarrage et câblage global (préfixe `/api`, guards)
+    - `src/config/`: `configuration.ts`, `env.validation.ts`, `env-files.ts`, `cors-origins.ts`
+    - `src/common/`: guards (`jwt-auth`, `roles`), décorateurs (`@Public`, `@Roles`, `@CurrentUser`), filtre d'erreurs
+    - `src/database/`: `data-source.ts` (CLI TypeORM), `migrations/` (10 migrations), `seeds/`
+    - `src/modules/`
+      - `identity/`: login Appwrite + Google, JWT, sessions, utilisateurs, rôles, organisations
+      - `admin-certificates/`: demandes, revue, paiement, émission, PDF à lien signé, vérification
+      - `bitnob/`: factures Lightning, réconciliation, webhooks, payouts, retraits, virements groupés
+      - `did-vc/`: DID, verifiable credentials, présentations
+      - `consent/`: consentements et journal d'accès (`/api/audit/...`)
+      - `healthz/`: sonde `GET /api/healthz`
+      - `lightning/`: registre des factures et paiements (sans route HTTP) ; LNbits retiré le 2026-10-15
+      - `health/`, `kyc/`, `education/`, `transport/`, `employment/`, `social-aid/`, `merchant/`: coquilles (`GET /api/{domaine}` seulement)
+    - `test/`: E2E (`jest-e2e.js`, `*.e2e-spec.ts`, `utils/`)
+    - `scripts/`: `appwrite-seed.ts`, `bitnob-smoke.ts`
+    - `Dockerfile`, `.env.example`, `.env.test.example`, `.env.prod.example` (les `.env` réels sont gitignorés)
+  - `frontmobile/`: Expo Router + React Native (wallet citoyen)
+    - `app/`: `(auth)/` (sign-in, sign-up), `(tabs)/` (accueil, formulaire, vérification, profil), `certificate/` (`new.tsx`, `[id].tsx`), `all-certificates.tsx`, `my-certificates.tsx`, `admin/` (écrans admin, données factices)
+    - `components/PaymentPanel.tsx`: facture Lightning et simulation dev
+    - `hooks/use-invoice-polling.ts`: suivi du paiement
+    - `services/`: `api.ts` (axios vers Nest), `appwriteAuth.ts`, `certificate-requests.ts`, `biometrics.ts`
+    - `config/config.ts`: URL de l'API et configuration Appwrite publique
+    - `lib/token-provider.ts`, `lib/global-provider.tsx`
+  - `frontweb/`: console de l'organisation (TanStack Start, Vite, port 3000 en dev)
+    - `src/routes/_console.tsx`, `src/router.tsx`
+    - `src/lib/api.ts`: appels vers Nest (`/auth/*`, `/admin-certificates/organization/*`)
+  - `docs/`: documentation canonique
+    - `ARCHITECTURE_AS_BUILT.md`, `DATABASE_MODEL.md`, `DEV_WORKFLOW.md`, `TESTING.md`
+    - `BUSINESS_RULES.md`, `DOMAIN_NOTES.md`, `IMPLEMENTATION_NOTES.md`, `KNOWN_ISSUES.md`
+    - `BITNOB.md`, `BITNOB_PASSER_EN_LIVE.md`, `ROADMAP_NEXT_STEPS.md`, `DECISIONS.md`, `LESSONS_LEARNED.md`
+  - `.claude/`: workflow des agents
+    - `CLAUDE2.md`: architecture backend et secrets (backend-nest)
+    - `HOW_TO_USE_AGENTS.md`: comment invoquer les agents
+    - `GIT_ADD_GUIDE.md`: règles `git add`
+    - `ARBORESCENCE.MD`: ce fichier
+    - `settings.local.json`
+    - `commands/atomic-commits.md`: commande de plan de commits
+    - `agents/`: `repo-explorer.md`, `frontend-analyst.md`, `frontend-designer.md`, `backend-analyst.md`, `security-analyst.md`, `migration-reviewer.md`, `code-reviewer.md`, `test-impact.md`, `debugger.md`, `implementer.md`, `knowledge-curator.md`, `docs-writer.md`, `integration-analyst.md`, `pr-describer.md`, `commit-planner.md`
+    - `agents/feat/`: `feat-certificates.md`, `feat-payments.md`, `feat-verification.md`, `feat-auth-identity.md`, `feat-admin.md`
+    - `agent-memory/`: mémoire par agent (`memory: project`)
