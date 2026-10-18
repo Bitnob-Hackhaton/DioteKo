@@ -5,6 +5,7 @@
   "description": "DioteKo root dev tooling: DioteKo's own Postgres + backend-nest app container + Appwrite + Idswyft (KYC)",
   "scripts": {
     "dev:up": "node scripts/docker-dev-up.js",
+    "dev:up:nobuild": "node scripts/docker-dev-up.js --no-build",
     "dev:down": "node scripts/docker-dev-up.js down",
     "dev:down:clean": "node scripts/docker-dev-up.js down -v",
     "dev:logs": "node scripts/docker-dev-up.js logs -f",

@@ -112,10 +112,11 @@ function hostPort() {
   }
 }
 
-function ensureDevDb({ extraArgs = [] } = {}) {
+function ensureDevDb({ extraArgs = [], noBuild = false } = {}) {
   process.env.DEV_UP_GUARD = "1"; // unlocks x-dev-up-guard for all compose calls
   const sub = extraArgs.length ? extraArgs : ["up", "-d"];
-  if (sub[0] === "up") sub.push("--build"); // build the backend-nest app image
+  // Build the app images, unless --no-build: Idswyft is built from a GitHub source (needs network), the images may already exist locally.
+  if (sub[0] === "up") sub.push(noBuild ? "--no-build" : "--build");
   // `down` must also see the opt-in ngrok tunnels (profile "tunnel", npm run tunnel), or their containers would be left behind.
   const profileArgs = sub[0] === "down" ? ["--profile", "tunnel"] : [];
   const args = ["docker", "compose", ...envFileArgs(), "-f", COMPOSE_FILE, ...profileArgs, ...sub];
@@ -129,9 +130,11 @@ function ensureDevDb({ extraArgs = [] } = {}) {
 }
 
 if (require.main === module) {
-  const sub = process.argv.slice(2);
-  console.log(`[START] dev tooling: docker compose ${(sub.length ? sub : ["up", "-d"]).join(" ")}`);
-  ensureDevDb({ extraArgs: sub });
+  const raw = process.argv.slice(2);
+  const noBuild = raw.includes("--no-build");
+  const sub = raw.filter((a) => a !== "--no-build");
+  console.log(`[START] dev tooling: docker compose ${(sub.length ? sub : ["up", "-d"]).join(" ")}${noBuild ? " (no build)" : ""}`);
+  ensureDevDb({ extraArgs: sub, noBuild });
   if ((sub[0] || "up") === "up") {
     const port = hostPort();
     const portNum = port ? port.replace(/^[^:]+:/, "") : DEFAULT_HOST_PORT;
