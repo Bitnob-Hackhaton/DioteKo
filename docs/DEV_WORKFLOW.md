@@ -100,6 +100,7 @@ curl -X POST http://localhost:3003/api/auth/login \
 | Command | Effect |
 |---|---|
 | `dev:up` | start DioteKo's Postgres, wait until it is healthy, create `dioteko_dev_bitnob`/`dioteko_test_bitnob` if missing, build & start `backend-nest` + Appwrite |
+| `dev:up:nobuild` | same as `dev:up` but without `--build`: reuses the images already built locally. Use it when Docker cannot reach GitHub (Idswyft is built from its GitHub source) |
 | `dev:down` | stop DioteKo's containers (data is kept in the `postgres_data` volume) |
 | `dev:down:clean` | same + delete the **Postgres and Appwrite** volumes (destructive) |
 | `dev:logs` / `dev:ps` | `docker compose logs -f` / list containers |
