@@ -9,9 +9,9 @@ const ENV_FILE = ".env.dev";
 // DioteKo's OWN Postgres (service `postgres` in docker-compose.dev.yml). Nothing
 // here looks for, reuses or connects to a Postgres container or network owned by
 // another project.
-const POSTGRES_CONTAINER = "dioteko-postgres";
-// Names are fixed: the E2E guards in backend-nest/test/ assert `dioteko_test` literally.
-const DATABASES = ["dioteko_dev", "dioteko_test"];
+const POSTGRES_CONTAINER = "dioteko-postgres-bitnob";
+// Names are fixed: the E2E guards in backend-nest/test/ assert `dioteko_test_bitnob` literally.
+const DATABASES = ["dioteko_dev_bitnob", "dioteko_test_bitnob"];
 
 // `docker compose --env-file .env.dev` supplies the values interpolated in
 // docker-compose.dev.yml / docker-compose.appwrite.yml. Every var also has a
@@ -42,7 +42,7 @@ loadEnvFile();
 
 const POSTGRES_USER = process.env.POSTGRES_USER || "postgres_user";
 const POSTGRES_PASSWORD = process.env.POSTGRES_PASSWORD || "postgres_password";
-const DEFAULT_HOST_PORT = process.env.DIOTEKO_PG_HOST_PORT || "5435";
+const DEFAULT_HOST_PORT = process.env.DIOTEKO_PG_HOST_PORT || "5442";
 
 function run(cmd) {
   execSync(cmd, { stdio: "inherit" });
@@ -84,8 +84,8 @@ function databaseExists(name) {
   return psql(`SELECT 1 FROM pg_database WHERE datname='${name}'`) === "1";
 }
 
-// Creates the DioteKo databases that are missing (idempotent). `dioteko_dev` is
-// normally created by POSTGRES_DB on first boot; `dioteko_test` never is.
+// Creates the DioteKo databases that are missing (idempotent). `dioteko_dev_bitnob` is
+// normally created by POSTGRES_DB on first boot; `dioteko_test_bitnob` never is.
 function ensureDatabases() {
   for (const name of DATABASES) {
     if (databaseExists(name)) {
@@ -134,7 +134,7 @@ if (require.main === module) {
     const port = hostPort();
     const portNum = port ? port.replace(/^[^:]+:/, "") : DEFAULT_HOST_PORT;
     console.log(`[RESULT] DioteKo Postgres: container ${POSTGRES_CONTAINER}, host port ${portNum}.`);
-    console.log(`[STATE] backend-nest started (http://localhost:3001/api-docs). Host-run apps: DB_PORT=${portNum} (backend-nest/.env, .env.test).`);
+    console.log(`[STATE] backend-nest started (http://localhost:3003/api-docs). Host-run apps: DB_PORT=${portNum} (backend-nest/.env, .env.test).`);
   }
 }
 

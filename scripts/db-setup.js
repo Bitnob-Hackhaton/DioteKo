@@ -34,10 +34,10 @@ function seedAppwriteBestEffort() {
 
 function runSchemaSteps() {
   // backend-nest only (the legacy Express backend/ was removed; tag legacy-express-backend keeps it).
-  // DEV database (dioteko_dev): NODE_ENV unset => backend-nest/.env.
+  // DEV database (dioteko_dev_bitnob): NODE_ENV unset => backend-nest/.env.
   npmRun("backend-nest", "migration:run");
   npmRun("backend-nest", "seed");
-  // TEST database (dioteko_test): NODE_ENV=test => backend-nest/.env.test.
+  // TEST database (dioteko_test_bitnob): NODE_ENV=test => backend-nest/.env.test.
   npmRun("backend-nest", "migration:run", { NODE_ENV: "test" });
   npmRun("backend-nest", "seed", { NODE_ENV: "test" });
   // Appwrite E2E user (no-op until Appwrite is configured). In runSchemaSteps

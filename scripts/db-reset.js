@@ -21,8 +21,8 @@ async function main() {
   }
   ensureDevDb();                                  // stack up first (sets DEV_UP_GUARD in process.env)
   for (const db of DATABASES) dropDatabase(db);   // WITH (FORCE) terminates app connections
-  ensureDatabases();                              // recreate dioteko_dev + dioteko_test
-  runSchemaSteps();                               // migration:run + seed for dioteko_dev AND dioteko_test
+  ensureDatabases();                              // recreate dioteko_dev_bitnob + dioteko_test_bitnob
+  runSchemaSteps();                               // migration:run + seed for dioteko_dev_bitnob AND dioteko_test_bitnob
   console.log("[STATE] db:reset complete — restart your dev servers if they were running");
 }
 

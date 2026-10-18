@@ -1,13 +1,13 @@
 # -----------------------------------------------------------------------------
 # Appwrite (self-hosted) — DEV ONLY. Included by docker-compose.dev.yml, so it
-# starts with `npm run dev:up` and shares the `dioteko-dev` project's default
+# starts with `npm run dev:up` and shares the `dioteko-dev-bitnob` project's default
 # network (backend-nest reaches it at http://appwrite/v1 in-network).
 #
 # Appwrite has no Postgres adapter — it brings its own MariaDB + Redis. These
 # never touch DioteKo's Postgres (`postgres` service in docker-compose.dev.yml).
 #
 # One-time setup after first boot: docs/DEV_WORKFLOW.md "Appwrite first-run".
-# Stop just this stack:  docker compose -p dioteko-dev stop appwrite appwrite-mariadb appwrite-redis
+# Stop just this stack:  docker compose -p dioteko-dev-bitnob stop appwrite appwrite-mariadb appwrite-redis
 #
 # Values come from the repo-root .env.dev (docker compose --env-file .env.dev,
 # wired in by scripts/docker-dev-up.js); every one has a safe dev default.
@@ -15,14 +15,14 @@
 services:
   appwrite:
     image: appwrite/appwrite:1.5.4
-    container_name: dioteko-appwrite
+    container_name: dioteko-appwrite-bitnob
     restart: unless-stopped
     depends_on:
       - appwrite-mariadb
       - appwrite-redis
     ports:
-      # Host 8090 -> container 80 (avoids the 80/443 clash with other stacks).
-      - "${APPWRITE_HTTP_PORT:-8090}:80"
+      # Host 9000 -> container 80 (avoids the 80/443 clash with other stacks).
+      - "${APPWRITE_HTTP_PORT:-9000}:80"
     environment:
       _APP_ENV: development
       _APP_LOCALE: en
@@ -60,7 +60,7 @@ services:
 
   appwrite-mariadb:
     image: mariadb:10.11
-    container_name: dioteko-appwrite-mariadb
+    container_name: dioteko-appwrite-mariadb-bitnob
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: appwrite
@@ -68,8 +68,8 @@ services:
       MYSQL_PASSWORD: ${APPWRITE_DB_PASS:-appwrite}
       MYSQL_ROOT_PASSWORD: ${APPWRITE_DB_ROOT_PASS:-appwrite_root}
     ports:
-      # Host 3310 -> container 3306 (avoids the 3306 clash with other stacks).
-      - "3310:3306"
+      # Host 3311 -> container 3306 (avoids the 3306 clash with other stacks).
+      - "3311:3306"
     command: >
       --innodb-flush-method=fsync
     volumes:
@@ -77,13 +77,13 @@ services:
 
   appwrite-redis:
     image: redis:7.2-alpine
-    container_name: dioteko-appwrite-redis
+    container_name: dioteko-appwrite-redis-bitnob
     restart: unless-stopped
     volumes:
       - appwrite_redis_data:/data
     ports:
-      # Host 6389 -> container 6379 (avoids the 6379 clash with other stacks).
-      - "6389:6379"
+      # Host 6399 -> container 6379 (avoids the 6379 clash with other stacks).
+      - "6399:6379"
 
 volumes:
   appwrite_uploads:

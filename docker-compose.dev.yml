@@ -1,8 +1,8 @@
-name: dioteko-dev
+name: dioteko-dev-bitnob
 
 # Guard: bare `docker compose up` must fail. Only scripts/docker-dev-up.js
 # (`npm run dev:up`) sets DEV_UP_GUARD — it starts the stack, waits for DioteKo's
-# own Postgres, creates the dioteko_dev / dioteko_test databases, and passes
+# own Postgres, creates the dioteko_dev_bitnob / dioteko_test databases, and passes
 # `--env-file .env.dev` for the values interpolated below.
 x-dev-up-guard: "${DEV_UP_GUARD:?Use `npm run dev:up`, not `docker compose up` directly — it waits for Postgres, creates the databases and loads .env.dev. See scripts/docker-dev-up.js}"
 
@@ -25,14 +25,14 @@ services:
     build:
       context: ./backend-nest
       dockerfile: Dockerfile
-    image: dioteko-backend-nest:dev
-    container_name: dioteko-backend-nest
+    image: dioteko-backend-nest-bitnob:dev
+    container_name: dioteko-backend-nest-bitnob
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "3001:3001"
+      - "3003:3003"
     env_file:
       # App config (JWT/VC secrets, Bitnob, …). The DB_* + APPWRITE_ENDPOINT
       # below override whatever this file says, so the container always targets
@@ -48,16 +48,16 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
       # Fixed name — the E2E guards assert `dioteko_test` literally, so the
       # dev/test names are not configurable.
-      DB_NAME: dioteko_dev
+      DB_NAME: dioteko_dev_bitnob
       # Talk to the bundled Appwrite over the compose network, not localhost.
       APPWRITE_ENDPOINT: http://appwrite/v1
-      # Same for Idswyft: the API is reached by service name over the compose network (container port 3001).
+      # Same for Idswyft: the API is reached by service name over the compose network (container port 3003).
       IDSWYFT_BASE_URL: http://idswyft-api:3001
       # ML engine of the same stack: lets the backend check a photo before it is sent into a verification session.
       IDSWYFT_ENGINE_URL: http://idswyft-ml-engine:3002
 
   # -------------------------------------------------------------------------
-  # DATABASE — DioteKo's own PostgreSQL. POSTGRES_DB creates `dioteko_dev` on
+  # DATABASE — DioteKo's own PostgreSQL. POSTGRES_DB creates `dioteko_dev_bitnob` on
   # first boot; `npm run dev:up` / `db:setup` create `dioteko_test` (no init
   # service). The host port is deliberately not 5432/5433/5434 so it does not
   # clash with Postgres instances other projects usually expose; change it with
@@ -65,20 +65,20 @@ services:
   # -------------------------------------------------------------------------
   postgres:
     image: postgres:18-alpine
-    container_name: dioteko-postgres
+    container_name: dioteko-postgres-bitnob
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
-      POSTGRES_DB: dioteko_dev
+      POSTGRES_DB: dioteko_dev_bitnob
     ports:
-      - "${DIOTEKO_PG_HOST_PORT:-5435}:5432"
+      - "${DIOTEKO_PG_HOST_PORT:-5442}:5432"
     volumes:
       # postgres:18+ keeps its data in a versioned sub-folder of
       # /var/lib/postgresql, so the volume is mounted there (not on .../data).
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres_user} -d dioteko_dev"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres_user} -d dioteko_dev_bitnob"]
       interval: 5s
       timeout: 5s
       retries: 12

@@ -38,7 +38,7 @@ function parseArgs(argv) {
 
 // Same source of truth as the compose file: .env.dev, then the default port.
 function apiBase() {
-  let port = process.env.IDSWYFT_API_HOST_PORT || "8000";
+  let port = process.env.IDSWYFT_API_HOST_PORT || "8010";
   const envDev = path.join(ROOT, ".env.dev");
   if (!process.env.IDSWYFT_API_HOST_PORT && fs.existsSync(envDev)) {
     const m = /^\s*IDSWYFT_API_HOST_PORT\s*=\s*(\d+)\s*$/m.exec(fs.readFileSync(envDev, "utf8"));
@@ -90,7 +90,7 @@ async function viaOtp(base, email) {
   if (sent.status !== 200 || typeof code !== "string") {
     throw new Error(
       `otp/send answered ${sent.status} without a code. The instance may send real e-mails, or the hourly limit is reached: ` +
-        "use the dashboard (http://localhost:8086, code in `docker logs dioteko-idswyft-api`) to create the key.",
+        "use the dashboard (http://localhost:8087, code in `docker logs dioteko-idswyft-api-bitnob`) to create the key.",
     );
   }
   const verified = await call(base, "POST", "/api/auth/developer/otp/verify", { body: { email, code } });
