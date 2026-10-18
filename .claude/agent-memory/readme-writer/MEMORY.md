@@ -1,0 +1,1 @@
+- [Screenshots and PII](feedback_readme_screenshots_pii.md) — check images for readable identity data, flag it, KYC docs source of truth

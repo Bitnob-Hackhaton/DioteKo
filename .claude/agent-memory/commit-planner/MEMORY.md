@@ -1,0 +1,1 @@
+- [pitch and PII never commit](feedback_pitch_and_pii_never_commit.md) — pitch/ excluded always; KYC screenshots and identity-looking mocks block commits
