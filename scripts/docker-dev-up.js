@@ -116,7 +116,9 @@ function ensureDevDb({ extraArgs = [] } = {}) {
   process.env.DEV_UP_GUARD = "1"; // unlocks x-dev-up-guard for all compose calls
   const sub = extraArgs.length ? extraArgs : ["up", "-d"];
   if (sub[0] === "up") sub.push("--build"); // build the backend-nest app image
-  const args = ["docker", "compose", ...envFileArgs(), "-f", COMPOSE_FILE, ...sub];
+  // `down` must also see the opt-in ngrok tunnels (profile "tunnel", npm run tunnel), or their containers would be left behind.
+  const profileArgs = sub[0] === "down" ? ["--profile", "tunnel"] : [];
+  const args = ["docker", "compose", ...envFileArgs(), "-f", COMPOSE_FILE, ...profileArgs, ...sub];
   console.log(`[CALL] ${args.join(" ")}`);
   run(args.join(" "));
   if (sub[0] === "up") {

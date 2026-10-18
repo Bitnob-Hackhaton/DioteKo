@@ -11,6 +11,12 @@
     "dev:ps": "node scripts/docker-dev-up.js ps",
     "db:setup": "node scripts/db-setup.js",
     "db:reset": "node scripts/db-reset.js",
-    "kyc:bootstrap": "node scripts/idswyft-bootstrap.js"
+    "kyc:bootstrap": "node scripts/idswyft-bootstrap.js",
+    "tunnel": "node scripts/tunnel.js",
+    "tunnel:appwrite": "node scripts/tunnel.js --appwrite",
+    "tunnel:backend": "node scripts/tunnel.js --backend",
+    "tunnel:logs": "node scripts/tunnel.js logs",
+    "tunnel:ps": "node scripts/tunnel.js ps",
+    "tunnel:down": "node scripts/tunnel.js down"
   }
 }

@@ -83,5 +83,40 @@ services:
       timeout: 5s
       retries: 12
 
+  # -------------------------------------------------------------------------
+  # HTTPS TUNNELS (ngrok) — opt-in: profile "tunnel", never started by `npm run dev:up`.
+  # `npm run tunnel` starts them, `npm run tunnel:logs` shows their logs (also visible
+  # in Docker Desktop). One ngrok account (authtoken + static domain) per tunnel — the free
+  # plan allows one agent session each. Values come from .env.dev; the script refuses to
+  # start a tunnel whose token or domain is empty.
+  # -------------------------------------------------------------------------
+  ngrok-appwrite:
+    image: ngrok/ngrok:latest
+    container_name: dioteko-ngrok-appwrite-bitnob
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    depends_on:
+      - appwrite
+    ports:
+      # ngrok inspector (live requests, replay) — localhost only. 4041/4042 avoid a host-run ngrok on 4040.
+      - "127.0.0.1:4041:4040"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_APPWRITE_AUTHTOKEN:-}
+    # The Host header is kept: Appwrite builds the Google OAuth callback from it.
+    command: ["http", "appwrite:80", "--url=${NGROK_APPWRITE_DOMAIN:-unset.invalid}", "--log=stdout"]
+
+  ngrok-backend:
+    image: ngrok/ngrok:latest
+    container_name: dioteko-ngrok-backend-bitnob
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    depends_on:
+      - backend-nest
+    ports:
+      - "127.0.0.1:4042:4040"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_BACKEND_AUTHTOKEN:-}
+    command: ["http", "backend-nest:3003", "--url=${NGROK_BACKEND_DOMAIN:-unset.invalid}", "--log=stdout"]
+
 volumes:
   postgres_data:
