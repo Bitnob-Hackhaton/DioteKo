@@ -77,7 +77,7 @@ Screenshots are in [frontmobile/Screen/](frontmobile/Screen/) (mobile app) and [
 </div>
 
 - **Inscription**: create-account form (first name, last name, e-mail, password) with Apple and Google buttons.
-- **Connexion**: sign-in form (e-mail, password) with Apple and Google buttons.
+- **Connexion**: sign-in form (e-mail, password, "Forgot your password?" link, link to sign up) with Apple and Google buttons.
 
 **Home.**
 
@@ -89,7 +89,7 @@ Screenshots are in [frontmobile/Screen/](frontmobile/Screen/) (mobile app) and [
 
 </div>
 
-- **Accueil**: counters (total, valid, pending, expiring), recent requests, and the actions "Request a certificate" and "Verify a certificate".
+- **Accueil**: counters (total, valid, pending, expiring, all at 0 here), the "recent requests" block (empty: no request yet), and the actions "Request a certificate" and "Verify a certificate". A bottom tab bar: Home, Request, Verification, Profile.
 - **Accueil2**: service cards for the birth, marriage and death extracts and the residence certificate (the first four visible), each at 100 sats with a "Choose" button.
 
 **Request and payment.**
@@ -104,33 +104,22 @@ Screenshots are in [frontmobile/Screen/](frontmobile/Screen/) (mobile app) and [
 
 - **Demande**: new request, listing the five certificate types at 100 sats each.
 - **Demande_Extrait**: birth extract form (full name, date and place of birth, parents' names, nationality, ID number). A banner says identity verification will become mandatory for this document.
-- **Demande_Extrait_Choix_Paiement**: request accepted and ready to pay. Bitcoin Lightning is the available method; other methods are shown as coming soon.
+- **Demande_Extrait_Choix_Paiement**: request accepted and ready to pay. Bitcoin Lightning is the available method; Bitcoin on-chain, Wave, Orange Money, YAS and PI-SPI are shown as coming soon.
 - **Demande_Extrait_Generation_QR_Code_Payment**: Lightning invoice as a QR code and text, 100 sats, expiry countdown, copy button, waiting state, and a development-only "simulate payment" button.
 
-**Certificate.**
+**Verification.** There is no screenshot of the issued certificate screen yet. The scan screenshot below shows an issued certificate extract with its QR code.
 
 <div align="center">
 
-| Certificate details and PDF preview |
-|:---:|
-| <a href="./frontmobile/Screen/Generation_Certificat.jpeg"><img src="./frontmobile/Screen/Generation_Certificat.jpeg" width="170" alt="Certificate details and PDF preview"></a> |
-
-</div>
-
-- **Generation_Certificat**: request ID, certificate ID, type, price, request date, expiry date, and a PDF preview with sample data.
-
-**Verification.**
-
-<div align="center">
-
-| Verify certificate screen | QR scan mode |
-|:---:|:---:|
-| <a href="./frontmobile/Screen/Verifier.jpeg"><img src="./frontmobile/Screen/Verifier.jpeg" width="170" alt="Verify certificate screen"></a> | <a href="./frontmobile/Screen/VeriferQrActivate.jpeg"><img src="./frontmobile/Screen/VeriferQrActivate.jpeg" width="170" alt="QR scan mode"></a> |
+| Verify certificate screen | Verification result | QR scan mode |
+|:---:|:---:|:---:|
+| <a href="./frontmobile/Screen/Verifier.jpeg"><img src="./frontmobile/Screen/Verifier.jpeg" width="170" alt="Verify certificate screen"></a> | <a href="./frontmobile/Screen/VeriferQrActivate.png"><img src="./frontmobile/Screen/VeriferQrActivate.png" width="170" alt="Certificate verified result"></a> | <a href="./frontmobile/Screen/VeriferQrActivate2.png"><img src="./frontmobile/Screen/VeriferQrActivate2.png" width="170" alt="QR scan mode, camera on a certificate extract"></a> |
 
 </div>
 
 - **Verifier**: enter a certificate ID, "Verify Manually", or "Scan QR Code". The subtitle says "on the blockchain", but the anchor is simulated (see limits above).
-- **VeriferQrActivate**: QR scan mode, with the camera view and a Cancel button. The photo was taken with the camera pointed at a development screen.
+- **VeriferQrActivate**: a certificate ID in the field and the result card "Certificate Verified: this certificate is authentic and valid", with the type (birth), the "valid until" date and a "Verify Another" button.
+- **VeriferQrActivate2**: QR scan mode. The camera view shows a certificate extract with a QR code, displayed on a computer screen, and a Cancel button. The previous "Certificate Verified" card is still visible below the camera.
 
 **Profile.**
 
@@ -186,9 +175,9 @@ Screenshots are in [frontmobile/Screen/](frontmobile/Screen/) (mobile app) and [
 
 - **Table_Submission_To_Be_Read**: the list with the default "À relire" status filter and all origins. One passport dossier, origin "Contrôle automatique en échec", status "À relire", with its age in minutes. Columns: reference, holder, document, origin, status, age.
 - **Illisible_MRZ**: the list with the "Tous les états" filter and two dossiers. One is "À relire" (reason "Document ou MRZ illisible"), the other is "Rejeté" (reason "Rejet définitif du fournisseur").
-- **User_Submission**: the detail panel of the passport dossier. A summary (holder, document, issuing country, filing time, number of attempts, reason for the review) above the front photo of the document. The agent compares the photos, then validates or rejects.
-- **Not_conclued_KYC**: the detail panel of an ID card dossier. A banner "Vérification automatique non concluante — décision manuelle requise" with the reason in French ("Le recto et le verso ne concordent pas") and the provider code. Then the OCR as read: one row per field with a confidence bar, a percentage and a word, and the front and back match score. A note says the personal data are visible here only and deleted at the decision.
-- **Scoring_Low_Validation_Agent**: the same kind of panel, scrolled to the OCR table, the front and back match score (58 %) and the start of the front photo. A low score does not end the dossier: the agent decides.
+- **User_Submission**: the detail panel of the passport dossier. A summary (holder, document, issuing country, filing time, number of attempts, reason for the review) above the front photo of the document. Parts of the summary and of the photo are circled or hidden by hand in this screenshot. The agent compares the photos, then validates or rejects.
+- **Not_conclued_KYC**: the detail panel of an ID card dossier. A banner "Vérification automatique non concluante — décision manuelle requise" with the reason in French ("Le recto et le verso ne concordent pas") and the provider code and detail (score 0.00). Then the OCR as read: one row per field (full name, date of birth, document number, expiry date) with a confidence bar, a percentage and a word, and the front and back match score (0 %). A note says the personal data are visible here only and deleted at the decision.
+- **Scoring_Low_Validation_Agent**: the same kind of panel, scrolled to the OCR table (three fields), the front and back match score (58 %) and the start of the front photo, partly hidden by hand. A low score does not end the dossier: the agent decides.
 - **Rejected_KYC**: the detail panel of a rejected dossier. The photos are gone ("Aucune pièce disponible : elles ont expiré ou n'ont pas été conservées"), and a box shows the agent who processed the dossier, the time, and the reason the agent wrote.
 
 ### 🧭 User flow
@@ -837,7 +826,7 @@ Les captures sont dans [frontmobile/Screen/](frontmobile/Screen/) (application m
 </div>
 
 - **Inscription** : formulaire de création de compte (prénom, nom, e-mail, mot de passe) avec les boutons Apple et Google.
-- **Connexion** : formulaire de connexion (e-mail, mot de passe) avec les boutons Apple et Google.
+- **Connexion** : formulaire de connexion (e-mail, mot de passe, lien « Forgot your password? », lien vers l'inscription) avec les boutons Apple et Google.
 
 **Accueil.**
 
@@ -849,7 +838,7 @@ Les captures sont dans [frontmobile/Screen/](frontmobile/Screen/) (application m
 
 </div>
 
-- **Accueil** : compteurs (total, valides, en attente, expiration), demandes récentes, et les actions « Demander un certificat » et « Vérifier un certificat ».
+- **Accueil** : compteurs (total, valides, en attente, expiration, tous à 0 ici), le bloc « demandes récentes » (vide : aucune demande pour l'instant), et les actions « Demander un certificat » et « Vérifier un certificat ». Une barre d'onglets en bas : Accueil, Demande, Vérification, Profil.
 - **Accueil2** : cartes de services pour les extraits de naissance, de mariage et de décès, et le certificat de résidence (les quatre premiers visibles), chacun à 100 sats avec un bouton « Choisir ».
 
 **Demande et paiement.**
@@ -864,33 +853,22 @@ Les captures sont dans [frontmobile/Screen/](frontmobile/Screen/) (application m
 
 - **Demande** : nouvelle demande, avec la liste des cinq types de certificats à 100 sats chacun.
 - **Demande_Extrait** : formulaire d'extrait de naissance (nom complet, date et lieu de naissance, noms des parents, nationalité, numéro de pièce). Un bandeau indique que la vérification d'identité deviendra obligatoire pour ce document.
-- **Demande_Extrait_Choix_Paiement** : demande acceptée et prête à être payée. Bitcoin Lightning est le moyen disponible ; les autres moyens sont affichés comme « bientôt disponible ».
+- **Demande_Extrait_Choix_Paiement** : demande acceptée et prête à être payée. Bitcoin Lightning est le moyen disponible ; Bitcoin on-chain, Wave, Orange Money, YAS et PI-SPI sont affichés comme « bientôt disponible ».
 - **Demande_Extrait_Generation_QR_Code_Payment** : facture Lightning en QR code et en texte, 100 sats, compte à rebours d'expiration, bouton de copie, état d'attente, et un bouton « simuler le paiement » réservé au développement.
 
-**Certificat.**
+**Vérification.** Il n'y a pas encore de capture de l'écran du certificat émis. La capture de scan ci-dessous montre un extrait de certificat émis avec son QR code.
 
 <div align="center">
 
-| Détail du certificat et aperçu du PDF |
-|:---:|
-| <a href="./frontmobile/Screen/Generation_Certificat.jpeg"><img src="./frontmobile/Screen/Generation_Certificat.jpeg" width="170" alt="Détail du certificat et aperçu du PDF"></a> |
-
-</div>
-
-- **Generation_Certificat** : identifiant de demande, identifiant de certificat, type, prix, date de demande, date d'expiration, et aperçu du PDF avec des données d'exemple.
-
-**Vérification.**
-
-<div align="center">
-
-| Écran de vérification de certificat | Mode scan QR |
-|:---:|:---:|
-| <a href="./frontmobile/Screen/Verifier.jpeg"><img src="./frontmobile/Screen/Verifier.jpeg" width="170" alt="Écran de vérification de certificat"></a> | <a href="./frontmobile/Screen/VeriferQrActivate.jpeg"><img src="./frontmobile/Screen/VeriferQrActivate.jpeg" width="170" alt="Mode scan QR"></a> |
+| Écran de vérification de certificat | Résultat de la vérification | Mode scan QR |
+|:---:|:---:|:---:|
+| <a href="./frontmobile/Screen/Verifier.jpeg"><img src="./frontmobile/Screen/Verifier.jpeg" width="170" alt="Écran de vérification de certificat"></a> | <a href="./frontmobile/Screen/VeriferQrActivate.png"><img src="./frontmobile/Screen/VeriferQrActivate.png" width="170" alt="Résultat : certificat vérifié"></a> | <a href="./frontmobile/Screen/VeriferQrActivate2.png"><img src="./frontmobile/Screen/VeriferQrActivate2.png" width="170" alt="Mode scan QR, caméra sur un extrait de certificat"></a> |
 
 </div>
 
 - **Verifier** : saisir un identifiant de certificat, « Vérifier manuellement », ou « Scanner un QR code ». Le sous-titre indique « sur la blockchain », mais l'ancrage est simulé (voir les limites ci-dessus).
-- **VeriferQrActivate** : mode scan QR, avec la vue caméra et un bouton Annuler. La photo a été prise caméra pointée vers un écran de développement.
+- **VeriferQrActivate** : un identifiant de certificat dans le champ et la carte de résultat « Certificate Verified : ce certificat est authentique et valide », avec le type (naissance), la date « valable jusqu'au » et un bouton « Verify Another ».
+- **VeriferQrActivate2** : mode scan QR. La vue caméra montre un extrait de certificat avec un QR code, affiché sur un écran d'ordinateur, et un bouton Annuler. La carte « Certificate Verified » précédente reste visible sous la caméra.
 
 **Profil.**
 
@@ -946,9 +924,9 @@ Les captures sont dans [frontmobile/Screen/](frontmobile/Screen/) (application m
 
 - **Table_Submission_To_Be_Read** : la liste avec le filtre de statut par défaut « À relire » et toutes les origines. Un dossier de passeport, origine « Contrôle automatique en échec », statut « À relire », avec son âge en minutes. Colonnes : référence, titulaire, pièce, origine, statut, âge.
 - **Illisible_MRZ** : la liste avec le filtre « Tous les états » et deux dossiers. L'un est « À relire » (motif « Document ou MRZ illisible »), l'autre est « Rejeté » (motif « Rejet définitif du fournisseur »).
-- **User_Submission** : le panneau de détail du dossier de passeport. Un résumé (titulaire, pièce, pays émetteur, date de dépôt, nombre de tentatives, motif du renvoi en relecture) au-dessus de la photo du recto du document. L'agent compare les photos, puis valide ou rejette.
-- **Not_conclued_KYC** : le panneau de détail d'un dossier de carte d'identité. Un bandeau « Vérification automatique non concluante — décision manuelle requise » avec le motif en français (« Le recto et le verso ne concordent pas ») et le code du fournisseur. Puis l'OCR tel que lu : une ligne par champ avec une barre de confiance, un pourcentage et un mot, et le score de concordance recto / verso. Une note précise que les données personnelles ne sont visibles qu'ici et supprimées à la décision.
-- **Scoring_Low_Validation_Agent** : le même type de panneau, défilé jusqu'au tableau OCR, au score de concordance recto / verso (58 %) et au début de la photo du recto. Un score bas ne clôt pas le dossier : l'agent décide.
+- **User_Submission** : le panneau de détail du dossier de passeport. Un résumé (titulaire, pièce, pays émetteur, date de dépôt, nombre de tentatives, motif du renvoi en relecture) au-dessus de la photo du recto du document. Des parties du résumé et de la photo sont entourées ou masquées à la main dans cette capture. L'agent compare les photos, puis valide ou rejette.
+- **Not_conclued_KYC** : le panneau de détail d'un dossier de carte d'identité. Un bandeau « Vérification automatique non concluante — décision manuelle requise » avec le motif en français (« Le recto et le verso ne concordent pas ») et le code et le détail du fournisseur (score 0,00). Puis l'OCR tel que lu : une ligne par champ (nom complet, date de naissance, numéro de la pièce, date d'expiration) avec une barre de confiance, un pourcentage et un mot, et le score de concordance recto / verso (0 %). Une note précise que les données personnelles ne sont visibles qu'ici et supprimées à la décision.
+- **Scoring_Low_Validation_Agent** : le même type de panneau, défilé jusqu'au tableau OCR (trois champs), au score de concordance recto / verso (58 %) et au début de la photo du recto, en partie masquée à la main. Un score bas ne clôt pas le dossier : l'agent décide.
 - **Rejected_KYC** : le panneau de détail d'un dossier rejeté. Les photos ont disparu (« Aucune pièce disponible : elles ont expiré ou n'ont pas été conservées »), et un encadré indique l'agent qui a traité le dossier, l'heure, et le motif écrit par l'agent.
 
 ### 🧭 Parcours utilisateur
