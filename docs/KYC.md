@@ -172,8 +172,8 @@ stateDiagram-v2
   pending --> verified : relecture final_result verified
   pending --> manual_review : relecture final_result manual_review
   pending --> failed : relecture final_result failed ou dossier abandonné (24 h)
-  pending --> rejected : relecture HARD_REJECTED
-  manual_review --> verified : décision dans le dashboard Idswyft puis relecture
+  pending --> rejected : relecture HARD_REJECTED (fallback désactivé ou clé absente ; sinon le dossier va à un agent)
+  manual_review --> verified : décision d un agent dans la console
   manual_review --> failed : idem
   manual_review --> rejected : idem
   verified --> [*]
@@ -195,7 +195,7 @@ Règles :
 - **Seule la relecture écrit un statut final.** Une réponse qui ne porte pas le même `verification_id` est ignorée et répond 502.
 - **`failed` et `rejected` sont clos.** Un nouvel essai ouvre une **nouvelle ligne** (dans la limite quotidienne).
 - **`manual_review`** attend une décision prise **uniquement dans le dashboard Idswyft**. DioteKo n'a pas d'écran pour cela.
-- `rejected` est un statut écrit par DioteKo quand Idswyft signale un refus définitif (`HARD_REJECTED`).
+- `rejected` est un statut écrit par DioteKo quand Idswyft signale un refus définitif (`HARD_REJECTED`). Avec le fallback actif (§16), ce refus, comme tout échec du contrôle automatique, part chez un agent au lieu de clore le dossier.
 
 ---
 
@@ -271,6 +271,8 @@ Modèles : `backend-nest/.env.example` (valeurs de dev), `.env.test.example`, `.
 
 - **Aucune image, aucun numéro de pièce, aucune donnée biométrique** n'est écrit sur le disque ni en base, **sauf** quand la relecture par un agent est active (§16) : une copie chiffrée et de courte durée est alors gardée. Sinon les photos restent en mémoire le temps de l'envoi (multer `memoryStorage`), puis sont transmises à Idswyft.
 - **Webhook réduit :** seuls `event`, `verification_id`, `status` et `timestamp` sont gardés (chaînes courtes). `data.ocr_data` (nom, date de naissance, numéro de pièce) est supprimé avant tout stockage ou log.
+- **Trace réduite d'une vérification automatique (§17) :** pour un dossier validé seul par le prestataire, une ligne chiffrée `kind = 'auto_audit'` garde uniquement des scores, seuils et indicateurs (aucune photo, aucun texte lu, aucun nom), jusqu'à `KYC_DOC_RETENTION_DAYS`. Jamais renvoyée au titulaire, jamais journalisée, lisible seulement par la route de détail de la relecture.
+- **Évaluation de la vérification automatique (§16) :** ce que le prestataire a lu (`ocr_data` : nom, date de naissance, numéro de pièce) et ses scores sont des données personnelles. Ils ne vivent que **chiffrés** (AES-256-GCM, `KYC_DOC_ENCRYPTION_KEY`) dans `kyc_documents` (`kind = 'assessment'`), seulement quand une relecture par un agent est possible, et sont supprimés avec les photos (décision, rétention `KYC_DOC_RETENTION_DAYS`). Jamais renvoyés au titulaire, jamais journalisés, lisibles uniquement par la route de détail de la relecture (`issuer` / `admin`). La ligne du webhook, elle, reste réduite à quatre champs.
 - **Raisons d'échec en énumération fixe.** Le texte du prestataire peut répéter ce qui a été lu sur la pièce. `classifyFailureReason` le ramène à `document_unreadable`, `document_expired`, `selfie_mismatch`, `liveness_failed`, `rejected` ou `other`.
 - **Le corps de réponse Idswyft n'est jamais recopié.** Seul son code d'erreur court (`providerCode`) est gardé pour les logs.
 - **Téléphone :** chaque photo prise est supprimée du cache de l'application dès qu'elle est envoyée, reprise (« Reprendre ») ou que l'écran est quitté (`frontmobile/services/photo-cleanup.ts`, `expo-file-system`). Best effort : un échec de suppression ne bloque pas le parcours.
@@ -321,7 +323,7 @@ Checklist à remplir :
 - [ ] Contrôle de vivacité (`liveness`) sur un selfie en direct.
 - [ ] Correspondance du visage (selfie contre photo de la pièce).
 - [ ] Octets réellement signés par Idswyft : corps brut reçu, ou `JSON.stringify(payload)` ? Si ce n'est pas le corps brut, la garde HMAC doit être revue.
-- [ ] Clés exactes de `data.ocr_data` (elles sont supprimées par DioteKo ; à connaître pour la suite).
+- [ ] Clés exactes de `data.ocr_data` du webhook (supprimées par DioteKo). Pour la route `/status`, l'évaluation (§16) lit `ocr_data` avec des alias de clés ; les formes de `cross_validation_results`, `face_match_results`, `liveness_results` et `risk_score` ne sont pas figées par un échantillon enregistré : relever une réponse réelle d'un dossier qui lit bien la pièce et ajuster `kyc-assessment.util.ts` si une clé diffère.
 - [ ] Code de réponse des envois (200 ou 201 ?) ; le client accepte tout 2xx.
 - [ ] Configuration de la limite de débit (valeur réelle, fenêtre de 24 h).
 - [ ] Verdict pour chaque type : CNI retenue, passeport seul, ou les deux (règle du plan : si la CNI est mal lue, ne proposer que le passeport et laisser `manual_review`).
@@ -500,10 +502,10 @@ Quand le MRZ ou Idswyft échoue, le titulaire peut quand même déposer ses piè
 | Variable | Valeurs | Effet |
 |---|---|---|
 | `KYC_MRZ_PRECHECK` | `strict` (défaut), `warn`, `off` | Hors `strict`, un MRZ illisible n'est plus un motif de refus de la photo côté app. **Forcé à `strict` en production.** |
-| `KYC_FALLBACK_MANUAL_REVIEW` | `off` (défaut), `on` | `on` : un échec du contrôle automatique (pièce illisible, photo refusée, session fermée, prestataire injoignable ou trop lent) envoie le dossier à un agent. Autorisé en production. Une raison finale (rejet inexpliqué, selfie non concordant, pièce expirée) **reste un échec**. Sans clé de chiffrement valide, le flag est sans effet. |
+| `KYC_FALLBACK_MANUAL_REVIEW` | `off` (défaut), `on` | `on` : **tout** refus ou échec du contrôle automatique envoie le dossier à un agent, quelle qu'en soit la raison : pièce illisible, recto et verso qui ne concordent pas (`CROSS_VALIDATION_FAILED`), pièce expirée, selfie non concordant, vivacité refusée, rejet inexpliqué (falsification possible), photo refusée, session fermée, prestataire injoignable ou trop lent. Le titulaire passe par **toutes** les étapes (recto, verso, selfie) et seul un agent valide ou rejette. Autorisé en production. Sans clé de chiffrement valide, le flag est sans effet (retour au comportement final ci-dessous). |
 | `KYC_PROVIDER_MODE` | `idswyft` (défaut), `manual_only` | `manual_only` : Idswyft n'est pas appelé, chaque dossier est décidé par un agent. **Forcé à `idswyft` en production.** Sans clé de chiffrement, l'ouverture d'une session répond 503. |
-| `KYC_DOC_ENCRYPTION_KEY` | 64 caractères hexadécimaux | Clé AES-256-GCM des copies (`openssl rand -hex 32`). Vide ou invalide : aucune copie n'est gardée. Une rotation rend les copies existantes illisibles. |
-| `KYC_DOC_RETENTION_DAYS` | 1 à 365 (30) | Durée de garde d'une copie non décidée. |
+| `KYC_DOC_ENCRYPTION_KEY` | 64 caractères hexadécimaux | Clé AES-256-GCM des copies (`openssl rand -hex 32`). Vide ou invalide : aucune copie n'est gardée, **ni la trace d'une vérification automatique (§17)**. Une rotation rend les copies existantes illisibles. |
+| `KYC_DOC_RETENTION_DAYS` | 1 à 365 (30) | Durée de garde d'une copie non décidée, et de la trace réduite d'une vérification automatique (§17). |
 
 `GET /kyc/status` renvoie en plus `reviewMode` (`automatic` ou `agent`) et `mrzPrecheck`, pour que l'app adapte son message.
 
@@ -513,8 +515,8 @@ Quand le MRZ ou Idswyft échoue, le titulaire peut quand même déposer ses piè
 stateDiagram-v2
   [*] --> pending: session ouverte
   pending --> verified: Idswyft verified
-  pending --> failed: échec final
-  pending --> pending_detache: fallback ou manual_only
+  pending --> failed: refus final, fallback éteint ou sans clé
+  pending --> pending_detache: tout refus du prestataire avec fallback actif, ou manual_only
   pending_detache --> manual_review: toutes les photos gardées
   pending --> manual_review: Idswyft manual_review
   manual_review --> verified: agent approuve
@@ -538,8 +540,167 @@ stateDiagram-v2
 
 ### Routes agent (`@Roles(ISSUER, ADMIN)`)
 
-`GET /api/kyc/review` (file, filtres `status`, `origin`), `GET /api/kyc/review/:id`, `GET /api/kyc/review/:id/documents/:kind`, `POST /api/kyc/review/:id/decision` (`approve` ou `reject` + note de 10 caractères minimum). Règles : un agent ne décide pas son propre dossier, une approbation exige toutes les photos, l'écriture est conditionnelle à `manual_review` (409 sinon), refus et décisions sont audités, un compte suspendu est refusé.
+`GET /api/kyc/review` (file ; filtres `status` = `manual_review` (défaut, la file de travail), `verified`, `rejected` ou `all` (tous les états), et `origin` = `provider`, `fallback`, `manual_only` ou `auto`), `GET /api/kyc/review/:id`, `GET /api/kyc/review/:id/documents/:kind`, `POST /api/kyc/review/:id/decision` (`approve` ou `reject` + note de 10 caractères minimum). Règles : un agent ne décide pas son propre dossier, une approbation exige toutes les photos, l'écriture est conditionnelle à `manual_review` (409 sinon), refus et décisions sont audités, un compte suspendu est refusé.
+
+### Évaluation de la vérification automatique (ce que l'agent voit)
+
+Quand le contrôle automatique échoue ou ne peut pas conclure, l'agent ne décide pas à l'aveugle : la console affiche **ce que le prestataire a lu et comment il a noté le dossier**. Cette lecture est conservée à part des photos, **chiffrée**, et jamais montrée au titulaire.
+
+```mermaid
+flowchart TD
+  A["Photos envoyées au prestataire"] --> B["Lecture du statut (sondage ou webhook)"]
+  B --> C{"Dossier verified ?"}
+  C -->|"oui"| D["Photos et lecture supprimées"]
+  D --> D2["Trace réduite sans donnée personnelle, chiffrée (kind auto_audit, §17)"]
+  C -->|"non"| E{"Un agent peut-il reprendre ?"}
+  E -->|"non : failed ou rejected final"| D
+  E -->|"oui : fallback, manual_review prestataire, dossier ouvert"| F["Évaluation chiffrée (kyc_documents, kind assessment)"]
+  F --> G["manual_review"]
+  G --> H["Agent : GET /api/kyc/review/:id"]
+  H --> I{"État de l'évaluation"}
+  I -->|"available"| J["Champs OCR, confiances, scores"]
+  I -->|"no_data"| K["Aucune donnée lue, code du prestataire"]
+  I -->|"unavailable"| L["Aucune donnée conservée"]
+  I -->|"not_run"| M["Mode manuel, pas de contrôle automatique"]
+  J --> N["Décision : approve ou reject"]
+  K --> N
+  L --> N
+  M --> N
+  N --> O["Suppression des photos ET de l'évaluation"]
+  classDef ok fill:#d1fae5,stroke:#047857
+  classDef wait fill:#fef3c7,stroke:#b45309
+  classDef step fill:#dbeafe,stroke:#1d4ed8
+  classDef auth fill:#ede9fe,stroke:#6d28d9
+  class D,D2,O ok
+  class G wait
+  class A,B,F step
+  class H,N auth
+```
+
+**Contenu** (`backend-nest/src/modules/kyc/kyc-assessment.util.ts`, extrait de `GET /api/v2/verify/:id/status`) : champs OCR tels que lus (`full_name`, `date_of_birth`, `id_number`, `expiry_date`, `nationality`, et quelques autres), confiance globale et par champ, scores de concordance recto / verso, de correspondance du visage et de vivacité, score de risque, étape de session, résultat final, **code de rejet stable** (`FRONT_OCR_FAILED`, `BACK_MRZ_CHECKSUM_FAILED`...) et sa phrase d'accompagnement. Une liste blanche de clés, des chaînes bornées, des nombres et des booléens : le reste de la réponse est ignoré. Les formes de `cross_validation_results`, `face_match_results` et `liveness_results` ne sont pas figées par un échantillon enregistré : la lecture est tolérante (plusieurs noms de clé) et un score absent reste `null`.
+
+**Stockage.** Même table, même clé, même chiffrement que les photos : une ligne `kyc_documents` de `kind = 'assessment'` (`mime = application/json`), AES-256-GCM, données authentifiées = `identifiant du dossier:assessment` (une ligne déplacée ne s'ouvre pas). **Aucune migration** : `kind` est un `varchar` sans contrainte. `assessment` n'est pas dans `KYC_DOCUMENT_KINDS` : il n'est jamais listé comme une photo, jamais servi par la route des photos, jamais compté parmi les photos exigées pour approuver.
+
+**Quand elle est écrite.** À chaque lecture (statut ou webhook, qui relit le statut) d'un dossier que le prestataire n'a pas encore tranché ou qui part chez un agent, **si une copie est voulue** (`KYC_FALLBACK_MANUAL_REVIEW=on` ou `manual_only`) et la clé valide, et seulement si elle a changé (empreinte sans la date de lecture, pour ne pas réécrire à chaque sondage de 3 s). Elle est écrite **avant** le basculement vers l'agent. Jamais pour un dossier `verified`, ni pour un `failed` / `rejected` final sans agent (fallback éteint ou sans clé). L'écriture est conditionnelle à `pending` ou `manual_review` (une seule requête). Un échec d'écriture ne change ni le statut ni le verdict. Après un refus de photo ou une session fermée (409), le serveur relit le statut une fois pour garder la lecture et nommer la vraie cause (`document_unreadable` au lieu de `other`).
+
+**Quand elle est supprimée.** Exactement quand les photos le sont : décision de l'agent, dossier `verified` / `failed` / `rejected` / annulé sans agent, et `expires_at` (`KYC_DOC_RETENTION_DAYS`). `deleteFor` efface toutes les lignes du dossier.
+
+**Où elle est visible.** Uniquement `GET /api/kyc/review/:id` (rôles `issuer` / `admin`, compte actif rattaché à une organisation, dossier en `manual_review`), déchiffrée pour la requête. Pas dans la liste, pas dans `GET /kyc/status`, pas dans une réponse du titulaire, pas dans un log (les logs ne portent que des comptes : nombre de champs, de scores, code de rejet). L'ouverture est écrite dans `access_logs` avec l'état seulement (`available`, `no_data`...), jamais le contenu. `failure_reason` reste une énumération fixe : l'évaluation s'ajoute à côté, elle ne la remplace pas.
+
+**Quatre états** (champ `assessment.state` de la réponse de détail) :
+
+| État | Sens | Ce que l'agent voit |
+|---|---|---|
+| `available` | le prestataire a lu ou noté quelque chose | tableau des champs avec une jauge de confiance chacun, scores, risque |
+| `no_data` | il a répondu sans rien lire (ex. `FRONT_OCR_FAILED`, `ocr_data` nul) | « La vérification automatique n'a produit aucune donnée » + le motif en clair |
+| `unavailable` | rien de conservé : panne, lecture expirée, clé changée, flag éteint | le même message, sans motif |
+| `not_run` | mode `manual_only` : pas de contrôle automatique | « Vérification manuelle », sans bandeau d'échec |
+
+La console (`KycReviewDrawer` + `KycAssessmentPanel`) affiche le bandeau « Vérification automatique non concluante — décision manuelle requise », le motif du prestataire en français (`kyc-labels.ts`), les champs lus avec confiance (barre, pourcentage **et** mot : élevée, moyenne, faible), les scores, puis les photos et les actions inchangées.
+
+**Mobile.** Aucune donnée lue n'est montrée au titulaire. Un dossier `manual_review` affiche « En attente de vérification par un agent ».
+
+**Tout refus du prestataire avec le fallback actif (règle du 2026-10-18).** « Même si le selfie, ou n'importe quoi, n'est pas bon, c'est l'agent qui relit. » Avec `KYC_FALLBACK_MANUAL_REVIEW=on` **et** une clé de chiffrement valide, aucun verdict automatique ne clôt un dossier en échec définitif : `refreshFromProvider` détache le dossier à l'agent pour **toute** raison (`document_unreadable`, `document_expired`, `selfie_mismatch`, `liveness_failed`, `rejected`, `other`), y compris une validation croisée recto / verso en échec ou un soupçon de falsification. L'ancienne règle (« un rejet inexpliqué ou un selfie non concordant reste final, pas d'override humain ») est **volontairement inversée** : un agent arbitre désormais, et lui seul peut valider ou rejeter.
+
+```mermaid
+flowchart TD
+  A["Le prestataire refuse : HARD_REJECTED ou final_result failed"] --> B{"Fallback actif : flag on et clé valide ?"}
+  B -->|"non"| C["Échec final : failed ou rejected, copies supprimées, le titulaire peut recommencer"]
+  B -->|"oui"| D["Lecture gardée chiffrée : OCR, scores, code du prestataire"]
+  D --> E["Dossier détaché : pending, review_origin fallback, failure_reason mappé"]
+  E --> F{"Toutes les photos sont gardées ?"}
+  F -->|"non"| G["L'app demande la photo manquante : verso puis selfie, sans appel au prestataire"]
+  G --> F
+  F -->|"oui"| H["manual_review : En attente de vérification par un agent"]
+  H --> I["Agent : valide ou rejette, seul à décider"]
+  classDef ok fill:#d1fae5,stroke:#047857
+  classDef ko fill:#fee2e2,stroke:#b91c1c
+  classDef wait fill:#fef3c7,stroke:#b45309
+  classDef step fill:#dbeafe,stroke:#1d4ed8
+  classDef auth fill:#ede9fe,stroke:#6d28d9
+  class C ko
+  class E,H wait
+  class A,D,G step
+  class I auth
+```
+
+- **Cas observé.** Recto et verso envoyés, puis `HARD_REJECTED` / `CROSS_VALIDATION_FAILED` (« Critical field mismatch ») : le dossier devenait `rejected` sans photo gardée et l'app ne pouvait plus atteindre le selfie. Désormais le dossier reste `pending` détaché avec `nextStep = selfie`, le selfie est gardé sans appel au prestataire (session close), puis le dossier passe à `manual_review`. Le même chemin vaut pour un refus qui arrive après le selfie (visage, vivacité, expiration) : `manual_review` avec la lecture, jamais `failed` ni `rejected`.
+- **Raison enregistrée.** `classifyFailureReason` lit maintenant le code stable du prestataire (`CROSS_VALIDATION_FAILED` donne `document_unreadable`) en plus de sa phrase ; sans code exploitable, un rejet définitif reste `rejected`. Seul le code mappé est stocké dans `failure_reason`, jamais le texte du prestataire.
+- **Un prestataire qui a oublié la session** (404 à la relecture) est lui aussi confié à l'agent au lieu d'être clos.
+- **Inchangé.** Quota `KYC_MAX_SESSIONS_PER_DAY`, limite de photos par session, aucune validation possible côté titulaire, 429 du prestataire non absorbé, journaux sans donnée personnelle, périmètre rôle / organisation et entrées d'audit de la relecture.
+- **Fallback éteint, ou clé de chiffrement absente (l'agent n'aurait rien à regarder) :** comportement final d'avant. `failed` ou `rejected`, copies supprimées, le titulaire recommence. L'app affiche alors l'écran de refus.
+- **Application mobile.** Aucun écran de résultat avant que les photos soient complètes : tant que le statut est `pending` avec un `nextStep`, l'app redemande la photo suivante ; si une photo antérieure manquait au moment du selfie, elle repart à cette étape (`frontmobile/app/kyc.tsx`). Le message final est « En attente de vérification par un agent ».
+- **Console.** Le code du prestataire est traduit (`CROSS_VALIDATION_FAILED` : « Le recto et le verso ne concordent pas. »), avec les mots-clés de repli (falsification, MRZ, visage, expiration...) et, pour un code inconnu, « Code du prestataire : ... ». La phrase du prestataire est affichée à l'agent en « Détail du fournisseur ».
+- Le précontrôle du verso renvoie 409 uniquement si le dossier n'est plus `pending` (fallback éteint ou clé absente) : vérifier `KYC_FALLBACK_MANUAL_REVIEW=on` et `KYC_DOC_ENCRYPTION_KEY` dans le conteneur `backend-nest`.
 
 ### Limite connue
 
 La file est **commune à toute la plateforme** : un dossier n'appartient à aucune organisation. Voir `docs/KNOWN_ISSUES.md`.
+
+---
+
+## 17. Audit des vérifications automatiques (dossiers validés sans agent)
+
+**Problème observé (2026-10-18).** Un dossier validé seul par le prestataire (visage 0,905 pour un seuil de 0,55, vivacité réussie, concordance recto / verso réussie, prestataire en **bac à sable**) devenait `verified` sans que personne ne puisse le revoir : la console ne listait que les dossiers où un agent était intervenu, et rien n'était conservé.
+
+**Choix.** La console liste aussi ces dossiers, en **lecture seule**, avec une **trace réduite sans donnée personnelle**. Aucune photo ni aucun texte lu sur la pièce n'est conservé (minimisation des données). **Le nom lu sur la pièce n'est volontairement pas comparé au nom du compte** : un nom Google peut légitimement différer de celui du document, rien ne bloque ni ne réoriente un dossier pour une différence de nom.
+
+```mermaid
+flowchart TD
+  A["Prestataire : final_result verified"] --> B["Dossier verified, write-once"]
+  B --> C["Suppression des photos et de la lecture OCR"]
+  C --> D{"Clé de chiffrement valide ?"}
+  D -->|"oui"| E["Trace réduite chiffrée : kyc_documents, kind auto_audit"]
+  D -->|"non"| F["Rien conservé, journal : no_encryption_key"]
+  E --> G["Console : Identité validée / Tous les états, origine Vérification automatique"]
+  F --> G
+  G --> H["Détail en lecture seule : scores, seuils, bac à sable"]
+  H --> I["Purge à expires_at : KYC_DOC_RETENTION_DAYS"]
+  classDef ok fill:#d1fae5,stroke:#047857
+  classDef step fill:#dbeafe,stroke:#1d4ed8
+  classDef auth fill:#ede9fe,stroke:#6d28d9
+  classDef ko fill:#fee2e2,stroke:#b91c1c
+  class B,E ok
+  class A,C step
+  class G,H auth
+  class F ko
+```
+
+### Ce que la trace contient
+
+Construite par `kyc-auto-audit.util.ts` directement depuis le corps brut de `GET /api/v2/verify/:id/status` (pas depuis la lecture OCR) : uniquement des nombres, des booléens, des codes courts et des **noms de contrôles** jamais leurs valeurs.
+
+| Champ | Contenu |
+|---|---|
+| `providerVerdict` | `final_result` du prestataire (`verified`) |
+| `isSandbox` | `is_sandbox` : le prestataire tournait en mode test |
+| `faceMatch` | similarité du visage, **seuil** exigé, réussi ou non |
+| `liveness` | score de vivacité, réussi ou non |
+| `crossValidation` | verdict, score, et **par champ** (`date_of_birth`, `id_number`...) réussi ou non + score, sans valeur |
+| `documentExpired` | le prestataire a signalé la pièce comme expirée |
+| `readAt` | date de lecture |
+
+Un nom de contrôle n'est gardé que s'il ressemble à un identifiant en minuscules (`^[a-z][a-z0-9_.-]{0,39}$`) : une chaîne qui pourrait être une valeur (espaces, majuscules, nom propre) est écartée. Comme pour l'évaluation du §16, les formes de `cross_validation_results`, `face_match_results` et `liveness_results` ne sont pas figées par un échantillon enregistré : la lecture est tolérante et une valeur absente reste `null`. À confirmer sur une réponse réelle (§12).
+
+### Stockage et rétention
+
+- Même table, même clé, même chiffrement que les photos : une ligne `kyc_documents` de `kind = 'auto_audit'` (AES-256-GCM, données authentifiées = `identifiant du dossier:auto_audit`). **Aucune migration** : `kind` est un `varchar` sans contrainte, et l'origine « Vérification automatique » est **dérivée** (statut `verified` et `review_origin` vide), jamais écrite.
+- Écrite par `KycService.refreshFromProvider` **après** la suppression des photos et de la lecture OCR, une seule requête conditionnelle à `status = 'verified'`. Elle n'exige que la clé valide, pas le flag `KYC_FALLBACK_MANUAL_REVIEW`. Sans clé, ou en cas d'échec d'écriture, le verdict n'est pas modifié et un `[RESULT] kyc auto audit not kept` explique pourquoi.
+- **Rétention : `expires_at` = `KYC_DOC_RETENTION_DAYS`**, la même purge que les copies (au démarrage, toutes les heures, et à chaque lecture de la file). La décision d'un agent (`deleteFor`) efface toutes les lignes du dossier, mais ne concerne pas un dossier validé seul. Passé `expires_at`, le dossier reste listé mais le détail annonce « Aucun détail n'est conservé ».
+- Les dossiers validés **avant** cette fonction apparaissent aussi (« Vérification automatique »), sans trace : même message.
+
+### Console
+
+- Filtre « Statut » : **À relire** (défaut, la file de travail, plus ancien d'abord), **Identité validée**, **Rejeté**, **Tous les états** (`status=all` dans l'URL, conservé au rechargement). Les vues autres que la file sont triées du plus récent au plus ancien. Chaque ligne garde son badge de statut et d'origine. Liste paginée comme avant.
+- « Identité validée » et « Tous les états » incluent **tous** les dossiers `verified` : ceux qu'un agent a décidés (origine du renvoi) et ceux du prestataire seul (origine **Vérification automatique**, filtre `origin=auto`). « Rejeté » et « À relire » restent limités aux dossiers où un agent est impliqué (`review_origin` renseigné).
+- Détail d'un dossier automatique (`GET /api/kyc/review/:id`, champ `autoAudit: { state: 'available' | 'unavailable', audit }`) : bandeau neutre **« Vérifié automatiquement »** avec les scores, et, si `isSandbox` vaut vrai, bandeau d'avertissement **« Fournisseur en mode bac à sable : résultat non fiable pour la production »**. Aucune photo, aucun bouton de décision (`decide` répond 409 : le dossier est déjà validé).
+- Rôles et périmètre inchangés : `issuer` / `admin`, compte actif rattaché à une organisation. L'ouverture du détail est écrite dans `access_logs` avec l'état de la trace seulement (`autoAudit: available`), jamais son contenu. La liste ne déchiffre rien.
+- Le nom du titulaire du **compte** (`holderName`) reste affiché comme pour les autres dossiers ; aucune donnée lue sur la pièce n'est exposée.
+
+### Mobile
+
+Inchangé : le titulaire ne voit ni la trace ni le drapeau bac à sable.
+
+### Règle à retenir
+
+Un verdict automatique ne doit jamais être invisible. Tout dossier `verified` doit pouvoir être retrouvé dans la console, sans que cela exige de garder une photo ou un texte lu sur une pièce d'identité.

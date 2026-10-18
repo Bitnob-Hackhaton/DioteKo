@@ -203,6 +203,29 @@ Source: `backend-nest/src/modules/identity/services/auth.service.ts`, `appwrite.
 - **One user = one identity credential** (`appwrite_user_id`, i.e. Google via Appwrite) + one DID + the holder role.
 - **No auto-link by email**: an email already used by another account returns 409. `google_id` is linked once; a
   different value later returns 403.
+- **Manual identity review shows what the automatic check read** (`docs/KYC.md` §16). When the automatic KYC
+  fails or cannot decide and a dossier goes to an agent (`manual_review`), the agent sees the OCR fields as read,
+  their confidence, the scores and the provider rejection code, or an explicit "no data" state. This reading is
+  personal data: kept only encrypted (same vault and key as the photos), deleted at the same moments as the photos
+  (decision, retention `KYC_DOC_RETENTION_DAYS`), never returned to the holder, never logged, and readable only through
+  `GET /api/kyc/review/:id` (issuer or admin of an organization). The holder only sees "waiting for an agent's
+  verification". `failure_reason` still stores a fixed code only.
+- **With the agent fallback on, no automatic verdict ends an identity dossier as a failure** (`docs/KYC.md` §16). When
+  `KYC_FALLBACK_MANUAL_REVIEW=on` and the encryption key is valid, every refusal of the automatic check (unreadable
+  document, front/back cross-validation failure, expiry, face or liveness failure, unexplained hard rejection, closed
+  session) detaches the dossier to an agent instead of closing it: the holder still sends front, back and selfie, the
+  reading is kept (encrypted) for the agent, and the dossier moves to `manual_review` once every photo is stored. Only an
+  agent can validate or reject; the holder has no override and the daily session cap still applies. This reverses the
+  earlier rule that an unexplained rejection or a face mismatch stays final. With the fallback off, or without a valid
+  key, a refusal is final as before.
+- **A dossier the provider verifies by itself stays auditable** (`docs/KYC.md` §17). Every `verified` identity dossier is
+  listed in the console ("Identité validée", "Tous les états"), read-only, with the origin "Vérification automatique"
+  when no agent was involved. What is kept for it is a reduced record with **no personal data** (provider verdict, face
+  similarity and threshold, liveness, per-field cross-validation pass/fail and scores without values, expired flag,
+  sandbox flag): no photo, no OCR text, no name. It is encrypted in the same vault, kept until `KYC_DOC_RETENTION_DAYS`,
+  and shown with a warning when the provider ran in sandbox mode ("résultat non fiable pour la production"). The name
+  read on the document is deliberately NOT compared with the account name (a Google name can legitimately differ).
+  The console status filter defaults to the work queue ("À relire"); "Tous les états" lists every state.
 
 ---
 

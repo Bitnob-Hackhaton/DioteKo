@@ -827,16 +827,16 @@ Index : `UQ_bitnob_payouts_active_cert` (unique sur `admin_certificate_ref_id` *
 
 Index : `UQ_kyc_verifications_one_active_per_user` — **unique partiel** sur `user_id` `WHERE status IN ('pending', 'manual_review')` (un dossier actif au plus par titulaire ; une course entre deux appels ouvre au plus une session).
 
-**`kyc_documents`** — non `+base` : `id uuid PK`, `created_at` (`timestamptz`). Entité `kyc-document.entity.ts`, migration `1789100000000-AddManualReviewToKyc`. Copie chiffrée d'une photo, gardée seulement pour la relecture (`docs/KYC.md` §16).
+**`kyc_documents`** — non `+base` : `id uuid PK`, `created_at` (`timestamptz`). Entité `kyc-document.entity.ts`, migration `1789100000000-AddManualReviewToKyc`. Copie chiffrée d'une photo, ou de l'évaluation de la vérification automatique (`kind = assessment`, données personnelles lues sur la pièce), gardée seulement pour la relecture et supprimée avec les photos (`docs/KYC.md` §16).
 
 | Colonne | Type | Null | Notes |
 |---|---|---|---|
 | `verification_id` | uuid | non | FK → `kyc_verifications`, `ON DELETE CASCADE` ; UK `UQ_kyc_documents_verification_kind` avec `kind` |
-| `kind` | varchar | non | `front`, `back` ou `selfie` |
+| `kind` | varchar | non | `front`, `back` ou `selfie` (une photo) ; `assessment` = lecture de la vérification automatique (OCR, scores), JSON chiffré, `mime = application/json`. `auto_audit` = trace réduite sans donnée personnelle d'un dossier validé par le prestataire seul (scores, seuils, indicateurs, `docs/KYC.md` §17), conservée jusqu'à `expires_at`. Pas de contrainte `CHECK` : aucune migration pour ces types |
 | `mime` | varchar | non | `image/jpeg` ou `image/png` (reconnu sur les octets) |
 | `iv` | bytea | non | 12 octets aléatoires |
 | `auth_tag` | bytea | non | étiquette GCM de 16 octets |
-| `ciphertext` | bytea | non | photo chiffrée AES-256-GCM |
+| `ciphertext` | bytea | non | photo (ou JSON de l'évaluation) chiffré AES-256-GCM ; données authentifiées = `verification_id:kind` |
 | `expires_at` | timestamptz | non | index `IDX_kyc_documents_expires_at` ; purge au démarrage puis toutes les heures |
 
 **`kyc_webhook_events`** — pas de `+base` : `id uuid PK`, `received_at` (`timestamptz`). Entité `kyc-webhook-event.entity.ts`, même migration. Aucune FK.
