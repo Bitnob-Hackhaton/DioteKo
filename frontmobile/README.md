@@ -33,7 +33,7 @@ Then press `a` (Android) or `i` (iOS), or scan the QR code with Expo Go. The bac
 | Variable | Purpose |
 |---|---|
 | `EXPO_PUBLIC_API_BASE_URL` | Explicit API base URL. On a physical phone, leave it empty: the app uses the LAN IP of the Metro host and the port below |
-| `EXPO_PUBLIC_API_PORT` | API port. Default `3001` |
+| `EXPO_PUBLIC_API_PORT` | API port. Default `3003` |
 | `EXPO_PUBLIC_APPWRITE_ENDPOINT` | Appwrite URL that the phone can reach. For Google sign-in, use an HTTPS tunnel |
 | `EXPO_PUBLIC_APPWRITE_PROJECT_ID` | Appwrite project ID |
 

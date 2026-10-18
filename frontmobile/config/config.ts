@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const API_PORT = process.env.EXPO_PUBLIC_API_PORT || '3001';
+const API_PORT = process.env.EXPO_PUBLIC_API_PORT || '3003';
 
 const isPrivateIpv4 = (host: string): boolean => {
   const privateIpv4Regex = /^(10\.(?:\d{1,3}\.){2}\d{1,3}|192\.168\.(?:\d{1,3})\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.(?:\d{1,3})\.\d{1,3})$/;
@@ -89,7 +89,7 @@ if (__DEV__) {
   if (Platform.OS !== 'web' && isLocalhost) {
     console.warn(
       `[Config] API_BASE_URL=${API_BASE_URL} (source: ${resolvedApiBaseUrl.source}) : injoignable depuis un telephone physique `
-      + '(localhost = le telephone). Retire EXPO_PUBLIC_API_BASE_URL (auto : IP LAN) ou utilise http://<IP-LAN>:3001/api.'
+      + '(localhost = le telephone). Retire EXPO_PUBLIC_API_BASE_URL (auto : IP LAN) ou utilise http://<IP-LAN>:3003/api.'
     );
   } else {
     console.log(`[Config] API_BASE_URL=${API_BASE_URL} (source: ${resolvedApiBaseUrl.source})`);
