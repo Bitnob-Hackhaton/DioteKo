@@ -1,8 +1,9 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
-import { KYC_REVIEW_ORIGINS, KycReviewOrigin } from '../kyc.constants';
+import { KYC_REVIEW_VIEW_ORIGINS, KycReviewViewOrigin } from '../kyc.constants';
 
-export const KYC_REVIEW_LIST_STATUSES = ['manual_review', 'verified', 'rejected'] as const;
+/** `all` lists every state at once (to review, validated, rejected); omitting the filter keeps the work queue (`manual_review`). */
+export const KYC_REVIEW_LIST_STATUSES = ['manual_review', 'verified', 'rejected', 'all'] as const;
 export type KycReviewListStatus = (typeof KYC_REVIEW_LIST_STATUSES)[number];
 
 /**
@@ -27,8 +28,8 @@ export class ListKycReviewsQueryDto {
   status?: KycReviewListStatus;
 
   @IsOptional()
-  @IsIn(KYC_REVIEW_ORIGINS)
-  origin?: KycReviewOrigin;
+  @IsIn(KYC_REVIEW_VIEW_ORIGINS)
+  origin?: KycReviewViewOrigin;
 }
 
 export const KYC_REVIEW_DECISIONS = ['approve', 'reject'] as const;

@@ -31,6 +31,8 @@ import {
   KycReviewOrigin,
   KycStatus,
 } from '../kyc.constants';
+import { assessmentDigest, KycAssessment } from '../kyc-assessment.util';
+import { KycAutoAudit } from '../kyc-auto-audit.util';
 import { isKycEnforced, KycPolicy } from '../kyc-policy.util';
 import { backPrecheckVerdict, KycPrecheckResult, looksLikeDocumentFront } from '../kyc-precheck.util';
 import { KycDocumentVaultService } from './kyc-document-vault.service';
@@ -86,10 +88,13 @@ const PROVIDER_STEP: Record<string, KycPhotoStep> = {
 };
 
 /**
- * Failure reasons the fallback sends to an agent: the document could not be read. An unexplained hard rejection
- * (`rejected`: possibly a forged document), a face mismatch or an expiry stay final: no human override from the holder's side.
+ * What the classifier reads in a provider answer: its stable rejection code (`CROSS_VALIDATION_FAILED`...) and its
+ * sentence. Never stored: only the mapped `KycFailureReason` is.
  */
-const FALLBACK_REASONS: readonly KycFailureReason[] = ['document_unreadable'];
+function providerFailureText(remote: IdswyftStatusView): string | null {
+  const text = [remote.assessment?.rejectionCode, remote.reason].filter((part): part is string => !!part).join(' ');
+  return text === '' ? null : text;
+}
 
 /** A certificate type seen by the gate: its id and KYC policy. */
 export interface KycGatedType {
@@ -116,6 +121,8 @@ export class KycService {
   private readonly logger = new Logger(KycService.name);
   private readonly lastRefresh = new Map<string, number>();
   private readonly precheckHits = new Map<string, number[]>();
+  /** Fingerprint of the last assessment kept per dossier, so a 3 s status poll does not rewrite an identical encrypted blob. */
+  private readonly lastAssessment = new Map<string, string>();
 
   constructor(
     @InjectRepository(KycVerification)
@@ -305,7 +312,13 @@ export class KycService {
     } catch (error) {
       // The automatic check is out of reach or refused the photo: with the fallback on, an agent takes over.
       if (this.fallbackActive && this.isFallbackError(error)) {
-        await this.detachToAgent(verification, error instanceof BadRequestException ? 'document_unreadable' : 'other');
+        let reason: KycFailureReason = error instanceof BadRequestException ? 'document_unreadable' : 'other';
+        // A refused photo or a closed session is the provider's verdict on what it read: keep that reading for the agent,
+        // and name the real cause (e.g. FRONT_OCR_FAILED -> document_unreadable) instead of "other".
+        if (error instanceof ConflictException || error instanceof BadRequestException) {
+          reason = (await this.readClosedSession(verification)) ?? reason;
+        }
+        await this.detachToAgent(verification, reason);
         await this.completeIfPhotosReady(verification);
         return this.toView(await this.withDetachedStep(verification));
       }
@@ -455,8 +468,14 @@ export class KycService {
       remote = await this.idswyft.getStatus(verification.providerVerificationId);
     } catch (error) {
       if (error instanceof IdswyftApiError && error.status === 404) {
-        // The provider no longer knows this session: it can never progress, so close it instead of retrying forever.
+        // The provider no longer knows this session: it can never progress, so stop polling it. With the fallback on an
+        // agent takes over (the photos are kept here); otherwise close the dossier instead of retrying forever.
         this.logger.warn(`[RESULT] kyc refreshFromProvider provider session gone sessionId=${verification.id}`);
+        if (this.fallbackActive) {
+          await this.detachToAgent(verification, 'other');
+          await this.completeIfPhotosReady(verification);
+          return verification;
+        }
         await this.closeAs(verification, KycStatus.FAILED, 'other');
         return verification;
       }
@@ -485,13 +504,23 @@ export class KycService {
     } else if (remote.finalResult === 'failed' || remote.status === 'HARD_REJECTED') {
       const hardRejected = remote.status === 'HARD_REJECTED';
       next = hardRejected ? KycStatus.REJECTED : KycStatus.FAILED;
-      failureReason = classifyFailureReason(remote.reason, hardRejected);
-      // The document or the automatic check failed (not the face or the expiry): with the fallback on, an agent decides.
-      if (this.fallbackActive && FALLBACK_REASONS.includes(failureReason)) {
+      failureReason = classifyFailureReason(providerFailureText(remote), hardRejected);
+      // Whatever the automatic check refused (unreadable or mismatching document, expiry, face, liveness, suspected
+      // forgery, unexplained rejection), with the fallback on it is an AGENT who arbitrates, never the provider: the
+      // holder goes through every step (front, back, selfie), the reading is kept for the agent, and only an agent
+      // can validate or reject. The photos already stored are the evidence; `completeIfPhotosReady` waits for the rest.
+      if (this.fallbackActive) {
+        await this.keepAssessment(verification, remote.assessment);
         await this.detachToAgent(verification, failureReason);
         await this.completeIfPhotosReady(verification);
         return verification;
       }
+    }
+
+    // What the automatic check read, for the agent who may take over. Not for a dossier that ends without an agent
+    // (verified, failed, rejected): nobody would look at it and the copies are deleted just below.
+    if (next === KycStatus.PENDING || next === KycStatus.MANUAL_REVIEW) {
+      await this.keepAssessment(verification, remote.assessment);
     }
 
     if (next !== verification.status) {
@@ -508,6 +537,8 @@ export class KycService {
         verification.reviewOrigin = reviewOrigin;
         // Final outcome without an agent (verified, failed, rejected): no one will look at the photos, so no copy is kept.
         if (next !== KycStatus.MANUAL_REVIEW) await this.vault.deleteFor(verification.id).catch(() => undefined);
+        // Verified by the provider alone: keep the reduced, PII-free audit so an agent can look back at how it decided.
+        if (next === KycStatus.VERIFIED) await this.keepAutoAudit(verification, remote.autoAudit);
       } else {
         // Another request closed it first: trust the stored row, never overwrite it.
         const stored = await this.verificationsRepository.findOne({ where: { id: verification.id } });
@@ -516,6 +547,59 @@ export class KycService {
     }
     this.logger.log(`[RESULT] kyc refreshFromProvider sessionId=${verification.id} status=${verification.status}`);
     return verification;
+  }
+
+  /**
+   * Keeps the encrypted assessment of the automatic check. Best effort: a failure here never changes the verdict or the
+   * status. Logs counts only (see `describeAssessment`), never a value read on the document.
+   */
+  private async keepAssessment(verification: KycVerification, assessment: KycAssessment | null | undefined): Promise<void> {
+    if (!assessment) return;
+    const digest = assessmentDigest(assessment);
+    if (this.lastAssessment.get(verification.id) === digest) return;
+    try {
+      if (await this.vault.storeAssessment(verification.id, assessment)) {
+        if (this.lastAssessment.size > 1000) this.lastAssessment.clear();
+        this.lastAssessment.set(verification.id, digest);
+      }
+    } catch (error) {
+      this.logger.warn(`[RESULT] kyc assessment not kept sessionId=${verification.id} reason=${(error as Error).name}`);
+    }
+  }
+
+  /**
+   * Keeps the reduced audit of a dossier the provider just verified (after the photos and the OCR assessment were deleted).
+   * Best effort: a failure never changes the verdict. Logs flags and counts only (see `describeAutoAudit`).
+   */
+  private async keepAutoAudit(verification: KycVerification, audit: KycAutoAudit | null | undefined): Promise<void> {
+    if (!audit) return;
+    try {
+      if (!(await this.vault.storeAutoAudit(verification.id, audit))) {
+        this.logger.warn(`[RESULT] kyc auto audit not kept sessionId=${verification.id} reason=${this.vault.canStore ? 'not_verified' : 'no_encryption_key'}`);
+      }
+    } catch (error) {
+      this.logger.warn(`[RESULT] kyc auto audit not kept sessionId=${verification.id} reason=${(error as Error).name}`);
+    }
+  }
+
+  /**
+   * After a refused photo or a closed session: reads the provider's state once to keep its reading for the agent and to
+   * learn WHY it stopped. Returns the mapped reason (any of them: with the fallback on an agent arbitrates all of
+   * them), or `null` when the read gives nothing usable. Best effort and fail-closed on the id: any problem leaves the
+   * caller's default reason.
+   */
+  private async readClosedSession(verification: KycVerification): Promise<KycFailureReason | null> {
+    try {
+      this.logger.log(`[CALL] kyc readClosedSession sessionId=${verification.id}`);
+      const remote = await this.idswyft.getStatus(verification.providerVerificationId);
+      if (remote.verificationId !== null && remote.verificationId !== verification.providerVerificationId) return null;
+      if (remote.finalResult === 'verified') return null;
+      await this.keepAssessment(verification, remote.assessment);
+      return classifyFailureReason(providerFailureText(remote), remote.status === 'HARD_REJECTED');
+    } catch (error) {
+      this.logger.warn(`[RESULT] kyc readClosedSession skipped sessionId=${verification.id} reason=${(error as Error).name}`);
+      return null;
+    }
   }
 
   /** Whether a provider failure is one the fallback may absorb: no answer, a refused photo or a closed session; not a rate limit. */

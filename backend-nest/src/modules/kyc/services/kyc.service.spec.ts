@@ -8,12 +8,31 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { KycAssessment } from '../kyc-assessment.util';
 import { KycStatus } from '../kyc.constants';
 import { IdswyftApiError } from './idswyft-http-client.service';
 import { classifyFailureReason, KYC_MAX_UPLOADS_PER_SESSION, KycService } from './kyc.service';
 
 const USER = 'user-1';
 const PROVIDER_ID = 'prov-1';
+
+/** What the automatic check read (personal data: it must never reach a log or a holder-facing view). */
+function makeAssessment(over: Partial<KycAssessment> = {}): KycAssessment {
+  return {
+    version: 1,
+    readAt: '2026-10-18T09:00:00.000Z',
+    providerStep: 'HARD_REJECTED',
+    finalResult: 'failed',
+    rejectionCode: 'FRONT_OCR_FAILED',
+    rejectionDetail: 'No required OCR fields could be read from the document',
+    ocr: { fields: [{ key: 'full_name', value: 'Awa Diallo', confidence: 0.4 }], confidence: 0.4 },
+    crossValidation: null,
+    faceMatch: null,
+    liveness: null,
+    riskScore: null,
+    ...over,
+  };
+}
 
 function makeVerification(over: Record<string, unknown> = {}) {
   return {
@@ -36,7 +55,7 @@ describe('KycService', () => {
   let usersRepo: { findOne: jest.Mock };
   let idswyft: { initialize: jest.Mock; upload: jest.Mock; getStatus: jest.Mock };
   let engine: { enabled: boolean; readText: jest.Mock; detectFace: jest.Mock };
-  let vault: { canStore: boolean; wanted: boolean; store: jest.Mock; kindsFor: jest.Mock; deleteFor: jest.Mock };
+  let vault: { canStore: boolean; wanted: boolean; store: jest.Mock; storeAssessment: jest.Mock; storeAutoAudit: jest.Mock; kindsFor: jest.Mock; deleteFor: jest.Mock };
   let configValues: Record<string, unknown>;
   let service: KycService;
 
@@ -69,6 +88,8 @@ describe('KycService', () => {
       canStore: true,
       wanted: false,
       store: jest.fn().mockResolvedValue(true),
+      storeAssessment: jest.fn().mockResolvedValue(true),
+      storeAutoAudit: jest.fn().mockResolvedValue(true),
       kindsFor: jest.fn().mockResolvedValue([]),
       deleteFor: jest.fn().mockResolvedValue(undefined),
     };
@@ -541,25 +562,356 @@ describe('KycService', () => {
         expect(view.status).toBe(KycStatus.MANUAL_REVIEW);
       });
 
-      it('keeps an unexplained hard rejection final: it may be a forged document, no human override', async () => {
-        repo.findOne.mockResolvedValue(makeVerification());
-        idswyft.getStatus.mockResolvedValue({ verificationId: PROVIDER_ID, status: 'HARD_REJECTED', finalResult: 'failed', reason: 'SOMETHING_ELSE', retryAvailable: false });
-        const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
-        expect(view.status).toBe(KycStatus.REJECTED);
-        expect(vault.deleteFor).toHaveBeenCalledWith('kyc-1');
+      describe('assessment of the automatic check', () => {
+        const hardRejected = (assessment: KycAssessment | null) => ({
+          verificationId: PROVIDER_ID,
+          status: 'HARD_REJECTED',
+          finalResult: 'failed',
+          reason: 'FRONT_OCR_FAILED',
+          retryAvailable: true,
+          assessment,
+        });
+
+        it('keeps what the provider read before the dossier goes to the agent (reason: document unreadable)', async () => {
+          const assessment = makeAssessment();
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(hardRejected(assessment));
+          vault.kindsFor.mockResolvedValue(['front', 'back', 'selfie']);
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(vault.storeAssessment).toHaveBeenCalledWith('kyc-1', assessment);
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { reviewOrigin: 'fallback', failureReason: 'document_unreadable' });
+          expect(vault.storeAssessment.mock.invocationCallOrder[0]).toBeLessThan(repo.update.mock.invocationCallOrder[0]);
+          expect(view.status).toBe(KycStatus.MANUAL_REVIEW);
+          // failure_reason keeps only the mapped code: the provider wording stays out of the dossier row.
+          expect(JSON.stringify(repo.update.mock.calls)).not.toContain('FRONT_OCR_FAILED');
+          expect(JSON.stringify(repo.update.mock.calls)).not.toContain('Awa');
+        });
+
+        it('keeps nothing when the provider returned no data (outage, ocr_data null): the agent then sees an explicit "no data" state', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(hardRejected(null));
+          vault.kindsFor.mockResolvedValue(['front', 'back', 'selfie']);
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(vault.storeAssessment).not.toHaveBeenCalled();
+          expect(view.status).toBe(KycStatus.MANUAL_REVIEW);
+        });
+
+        it('never keeps it for a dossier the provider verified by itself (nobody would look at it)', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue({ verificationId: PROVIDER_ID, status: 'COMPLETE', finalResult: 'verified', reason: null, retryAvailable: false, assessment: makeAssessment({ finalResult: 'verified' }) });
+          await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(vault.storeAssessment).not.toHaveBeenCalled();
+        });
+
+        it('keeps it for a face failure too: an agent arbitrates every refusal while the fallback is on', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue({ verificationId: PROVIDER_ID, status: 'COMPLETE', finalResult: 'failed', reason: 'face mismatch', retryAvailable: true, assessment: makeAssessment() });
+          vault.kindsFor.mockResolvedValue(['front', 'back', 'selfie']);
+          await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(vault.storeAssessment).toHaveBeenCalledTimes(1);
+        });
+
+        it('keeps it as soon as the provider has read something on an open dossier, once per distinct content', async () => {
+          const verification = makeVerification();
+          const inProgress = { verificationId: PROVIDER_ID, status: 'AWAITING_BACK', finalResult: null, reason: null, retryAvailable: false };
+          const read = (over: Partial<KycAssessment> = {}) => makeAssessment({ providerStep: 'AWAITING_BACK', finalResult: null, rejectionCode: null, ...over });
+          idswyft.getStatus.mockResolvedValue({ ...inProgress, assessment: read() });
+
+          await service.refreshFromProvider(verification as never);
+          // The 3 s poll reads the same thing again, with a new read date: no rewrite.
+          idswyft.getStatus.mockResolvedValue({ ...inProgress, assessment: read({ readAt: '2026-10-18T09:00:09.000Z' }) });
+          await service.refreshFromProvider(verification as never);
+          expect(vault.storeAssessment).toHaveBeenCalledTimes(1);
+
+          idswyft.getStatus.mockResolvedValue({ ...inProgress, assessment: read({ riskScore: 0.5 }) });
+          await service.refreshFromProvider(verification as never);
+          expect(vault.storeAssessment).toHaveBeenCalledTimes(2);
+        });
+
+        it('does not let a failure to keep it change the verdict', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(hardRejected(makeAssessment()));
+          vault.storeAssessment.mockRejectedValue(new Error('db down'));
+          vault.kindsFor.mockResolvedValue(['front', 'back', 'selfie']);
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(view.status).toBe(KycStatus.MANUAL_REVIEW);
+        });
+
+        it('is never in what the holder gets, and never in a log line', async () => {
+          const logs: string[] = [];
+          for (const level of ['log', 'warn', 'error'] as const) {
+            jest.spyOn(Logger.prototype, level).mockImplementation((message: unknown) => void logs.push(String(message)));
+          }
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(hardRejected(makeAssessment({ riskScore: 0.77 })));
+          vault.kindsFor.mockResolvedValue(['front', 'back', 'selfie']);
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          const serialized = JSON.stringify(view);
+          expect(serialized).not.toContain('Awa Diallo');
+          expect(serialized).not.toContain('FRONT_OCR_FAILED');
+          expect(serialized).not.toMatch(/assessment|ocr|riskScore|0\.77/i);
+          expect(logs.join('\n')).not.toContain('Awa Diallo');
+          expect(logs.join('\n')).not.toContain('0.77');
+        });
+
+        it('after a hard rejection of the FRONT the dossier is detached with reason document_unreadable, and the back precheck is NOT a 409', async () => {
+          const verification = makeVerification();
+          repo.findOne.mockResolvedValue(verification);
+          idswyft.getStatus.mockResolvedValue(hardRejected(makeAssessment()));
+          vault.kindsFor.mockResolvedValue(['front']);
+
+          const view = await service.getStatus(USER);
+
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { reviewOrigin: 'fallback', failureReason: 'document_unreadable' });
+          expect(repo.update).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: KycStatus.REJECTED }));
+          // The agent can only approve with every photo (no blind approval), so the app goes on to the back and the selfie.
+          expect(view).toMatchObject({ status: KycStatus.PENDING, nextStep: 'back', reviewMode: 'agent' });
+          engine.enabled = false;
+          await expect(service.precheck(USER, 'kyc-1', 'back', photo)).resolves.toBe('skipped');
+        });
+
+        it('when the provider answers 409 on the next photo, reads why it stopped: the dossier is detached as document_unreadable, not "other"', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.upload.mockRejectedValue(new IdswyftApiError('closed', 409, null));
+          idswyft.getStatus.mockResolvedValue(hardRejected(makeAssessment()));
+          vault.kindsFor.mockResolvedValue(['front']);
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'back', photo);
+
+          expect(vault.storeAssessment).toHaveBeenCalledTimes(1);
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { reviewOrigin: 'fallback', failureReason: 'document_unreadable' });
+          expect(view.status).toBe(KycStatus.PENDING);
+        });
+
+        it('keeps the default reason when the read after a 409 fails or answers for another session', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.upload.mockRejectedValue(new IdswyftApiError('closed', 409, null));
+          idswyft.getStatus.mockRejectedValue(new IdswyftApiError('down', null, null));
+          await service.uploadStep(USER, 'kyc-1', 'back', photo);
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { reviewOrigin: 'fallback', failureReason: 'other' });
+
+          repo.update.mockClear();
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue({ ...hardRejected(makeAssessment()), verificationId: 'someone-else' });
+          await service.uploadStep(USER, 'kyc-1', 'back', photo);
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { reviewOrigin: 'fallback', failureReason: 'other' });
+          expect(vault.storeAssessment).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('every provider refusal is arbitrated by an agent (the holder goes through ALL the steps)', () => {
+        const crossValidationFailed = (over: Record<string, unknown> = {}) => ({
+          verificationId: PROVIDER_ID,
+          status: 'HARD_REJECTED',
+          finalResult: 'failed',
+          // Observed 2026-10-18: the sentence says nothing useful, the stable code is in the assessment.
+          reason: 'Critical field mismatch',
+          retryAvailable: false,
+          assessment: makeAssessment({ rejectionCode: 'CROSS_VALIDATION_FAILED', rejectionDetail: 'Critical field mismatch', providerStep: 'HARD_REJECTED' }),
+          ...over,
+        });
+
+        it('keeps a cross-validation rejection after the BACK upload pending and detached, and asks for the SELFIE', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(crossValidationFailed());
+          vault.kindsFor.mockResolvedValue(['front', 'back']);
+
+          const view = await service.getStatus(USER);
+
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { reviewOrigin: 'fallback', failureReason: 'document_unreadable' });
+          expect(repo.update).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: KycStatus.REJECTED }));
+          expect(repo.update).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: KycStatus.FAILED }));
+          // The reading (OCR as read, scores, the provider code) is kept for the agent, the photos too.
+          expect(vault.storeAssessment).toHaveBeenCalledTimes(1);
+          expect(vault.deleteFor).not.toHaveBeenCalled();
+          expect(view).toMatchObject({ status: KycStatus.PENDING, nextStep: 'selfie', canRestart: false, reviewMode: 'agent' });
+        });
+
+        it('classifies by the provider code, not only by its sentence, and an unexplained rejection is still detached ("rejected")', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(crossValidationFailed({ assessment: null }));
+          vault.kindsFor.mockResolvedValue(['front', 'back']);
+
+          const view = await service.getStatus(USER);
+
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { reviewOrigin: 'fallback', failureReason: 'rejected' });
+          expect(view).toMatchObject({ status: KycStatus.PENDING, nextStep: 'selfie' });
+        });
+
+        it('then takes the selfie without calling the closed provider session (no 409 dead end) and waits for the agent', async () => {
+          repo.findOne.mockResolvedValue(makeVerification({ reviewOrigin: 'fallback', failureReason: 'document_unreadable' }));
+          vault.kindsFor.mockResolvedValue(['front', 'back', 'selfie']);
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(idswyft.upload).not.toHaveBeenCalled();
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { status: KycStatus.MANUAL_REVIEW });
+          expect(view.status).toBe(KycStatus.MANUAL_REVIEW);
+        });
+
+        it('does not stop a holder whose SELFIE upload meets the closed session (409): the cross-validation reading is kept, the selfie too', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.upload.mockRejectedValue(new IdswyftApiError('closed', 409, null));
+          idswyft.getStatus.mockResolvedValue(crossValidationFailed());
+          vault.kindsFor.mockResolvedValue(['front', 'back', 'selfie']);
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(vault.store).toHaveBeenCalledWith('kyc-1', 'selfie', photo);
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { reviewOrigin: 'fallback', failureReason: 'document_unreadable' });
+          expect(view.status).toBe(KycStatus.MANUAL_REVIEW);
+        });
+
+        it.each([
+          ['a face mismatch', 'face mismatch', 'selfie_mismatch'],
+          ['a liveness failure', 'LIVENESS_FAILED', 'liveness_failed'],
+          ['an expired document', 'document expired', 'document_expired'],
+          ['an unexplained hard rejection (possible forgery)', 'SOMETHING_ELSE', 'rejected'],
+        ])('sends %s after the selfie to the agent (manual_review), with the reading, not to a final failure', async (_label, reason, mapped) => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue({
+            verificationId: PROVIDER_ID,
+            status: reason === 'SOMETHING_ELSE' ? 'HARD_REJECTED' : 'COMPLETE',
+            finalResult: 'failed',
+            reason,
+            retryAvailable: true,
+            assessment: makeAssessment({ rejectionCode: null }),
+          });
+          vault.kindsFor.mockResolvedValue(['front', 'back', 'selfie']);
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { reviewOrigin: 'fallback', failureReason: mapped });
+          expect(repo.update).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: KycStatus.REJECTED }));
+          expect(repo.update).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: KycStatus.FAILED }));
+          expect(vault.storeAssessment).toHaveBeenCalledTimes(1);
+          expect(vault.deleteFor).not.toHaveBeenCalled();
+          expect(view).toMatchObject({ status: KycStatus.MANUAL_REVIEW, canRestart: false });
+          // The holder only sees the generic state: only a fixed code, never the provider's wording.
+          expect(JSON.stringify(view)).not.toMatch(/SOMETHING_ELSE|Awa Diallo|FRONT_OCR_FAILED/);
+        });
+
+        it('waits for the missing photos when the refusal comes before the selfie, whatever the reason', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue({ verificationId: PROVIDER_ID, status: 'COMPLETE', finalResult: 'failed', reason: 'face mismatch', retryAvailable: true });
+          vault.kindsFor.mockResolvedValue(['front']);
+
+          const view = await service.getStatus(USER);
+
+          expect(view).toMatchObject({ status: KycStatus.PENDING, nextStep: 'back' });
+        });
+
+        it('hands a provider that forgot the session (404) over to the agent instead of closing the dossier', async () => {
+          const verification = makeVerification();
+          idswyft.getStatus.mockRejectedValue(new IdswyftApiError('gone', 404, null));
+          vault.kindsFor.mockResolvedValue(['front', 'back']);
+
+          await service.refreshFromProvider(verification as never);
+
+          expect(repo.update).toHaveBeenCalledWith({ id: 'kyc-1', status: KycStatus.PENDING }, { reviewOrigin: 'fallback', failureReason: 'other' });
+          expect(verification.status).toBe(KycStatus.PENDING);
+          expect(vault.deleteFor).not.toHaveBeenCalled();
+        });
+
+        it('never leaves a refusal a way for the holder to override: no verified, the daily cap still applies', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(crossValidationFailed());
+          vault.kindsFor.mockResolvedValue(['front', 'back', 'selfie']);
+          await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+          expect(repo.update).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: KycStatus.VERIFIED }));
+
+          repo.findOne.mockResolvedValue(null);
+          repo.count.mockResolvedValue(5);
+          await expect(service.startSession(USER, 'national_id')).rejects.toBeInstanceOf(HttpException);
+        });
+
+        it('logs ids, reasons and states only, never the provider sentence or a value read', async () => {
+          const logs: string[] = [];
+          for (const level of ['log', 'warn', 'error'] as const) {
+            jest.spyOn(Logger.prototype, level).mockImplementation((message: unknown) => void logs.push(String(message)));
+          }
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(crossValidationFailed());
+          vault.kindsFor.mockResolvedValue(['front', 'back']);
+
+          await service.getStatus(USER);
+
+          const logged = logs.join('\n');
+          expect(logged).toContain('detached for agent review');
+          expect(logged).not.toContain('Critical field mismatch');
+          expect(logged).not.toContain('Awa Diallo');
+        });
+      });
+
+      describe('the old final behaviour stays when no agent can take over', () => {
+        const unexplained = { verificationId: PROVIDER_ID, status: 'HARD_REJECTED', finalResult: 'failed', reason: 'SOMETHING_ELSE', retryAvailable: false };
+        const crossFailed = { ...unexplained, reason: 'Critical field mismatch', assessment: makeAssessment({ rejectionCode: 'CROSS_VALIDATION_FAILED' }) };
+
+        it('flag off: a hard rejection is a final rejection and the copies are deleted', async () => {
+          configValues['kyc.fallbackManualReview'] = false;
+          vault.wanted = false;
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(unexplained);
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(view).toMatchObject({ status: KycStatus.REJECTED, canRestart: true });
+          expect(vault.deleteFor).toHaveBeenCalledWith('kyc-1');
+          expect(repo.update).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ reviewOrigin: 'fallback' }));
+        });
+
+        it('flag off: a cross-validation rejection and a face mismatch fail the dossier', async () => {
+          configValues['kyc.fallbackManualReview'] = false;
+          vault.wanted = false;
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(crossFailed);
+          expect((await service.getStatus(USER)).status).toBe(KycStatus.REJECTED);
+
+          lastRefreshReset();
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue({ verificationId: PROVIDER_ID, status: 'COMPLETE', finalResult: 'failed', reason: 'face mismatch', retryAvailable: true });
+          expect((await service.uploadStep(USER, 'kyc-1', 'selfie', photo)).status).toBe(KycStatus.FAILED);
+        });
+
+        it('vault cannot store (no valid key): every refusal is final again, since the agent would have nothing to look at', async () => {
+          vault.canStore = false;
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(crossFailed);
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(view).toMatchObject({ status: KycStatus.REJECTED, reviewMode: 'automatic' });
+          expect(repo.update).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ reviewOrigin: 'fallback' }));
+        });
+
+        it('flag off: a provider that forgot the session closes the dossier as before', async () => {
+          configValues['kyc.fallbackManualReview'] = false;
+          const verification = makeVerification();
+          idswyft.getStatus.mockRejectedValue(new IdswyftApiError('gone', 404, null));
+          await service.refreshFromProvider(verification as never);
+          expect(verification.status).toBe(KycStatus.FAILED);
+        });
+
+        /** The status poll is throttled per session (3 s): forget it between two reads in the same test. */
+        function lastRefreshReset() {
+          (service as unknown as { lastRefresh: Map<string, number> }).lastRefresh.clear();
+        }
       });
 
       it('refuses a detached upload when the copy could not be written because the dossier moved on', async () => {
         repo.findOne.mockResolvedValue(makeVerification({ reviewOrigin: 'fallback' }));
         vault.store.mockResolvedValue(false);
         await expect(service.uploadStep(USER, 'kyc-1', 'front', photo)).rejects.toBeInstanceOf(ConflictException);
-      });
-
-      it('still fails a selfie mismatch: that is not the document or the automatic check', async () => {
-        repo.findOne.mockResolvedValue(makeVerification());
-        idswyft.getStatus.mockResolvedValue({ verificationId: PROVIDER_ID, status: 'COMPLETE', finalResult: 'failed', reason: 'face mismatch', retryAvailable: true });
-        const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
-        expect(view.status).toBe(KycStatus.FAILED);
       });
 
       it('does not absorb a rate limit (429)', async () => {
@@ -594,6 +946,113 @@ describe('KycService', () => {
         repo.findOne.mockResolvedValue(makeVerification());
         await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
         expect(vault.deleteFor).toHaveBeenCalledWith('kyc-1');
+      });
+
+      describe('audit of an automatic verification', () => {
+        const autoAudit = {
+          version: 1,
+          readAt: '2026-10-18T10:00:00.000Z',
+          providerVerdict: 'verified',
+          isSandbox: true,
+          faceMatch: { score: 0.905, threshold: 0.55, passed: true },
+          liveness: { score: 0.91, threshold: null, passed: true },
+          crossValidation: { verdict: 'PASS', passed: null, score: 0.88, checks: [{ name: 'date_of_birth', passed: true, score: 1 }] },
+          documentExpired: false,
+        };
+        const verified = (over: Record<string, unknown> = {}) => ({
+          verificationId: PROVIDER_ID,
+          status: 'COMPLETE',
+          finalResult: 'verified',
+          reason: null,
+          retryAvailable: false,
+          assessment: makeAssessment({ finalResult: 'verified' }),
+          autoAudit,
+          ...over,
+        });
+
+        it('keeps the reduced audit AFTER the photos and the OCR assessment are deleted, and not the OCR assessment itself', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(verified());
+
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(view.status).toBe(KycStatus.VERIFIED);
+          expect(vault.storeAutoAudit).toHaveBeenCalledWith('kyc-1', autoAudit);
+          expect(vault.deleteFor.mock.invocationCallOrder[0]).toBeLessThan(vault.storeAutoAudit.mock.invocationCallOrder[0]);
+          expect(vault.storeAssessment).not.toHaveBeenCalled();
+          // The audit carries no value read on the document.
+          expect(JSON.stringify(vault.storeAutoAudit.mock.calls)).not.toContain('Awa');
+        });
+
+        it('keeps nothing for a dossier that goes to an agent, fails, or is still open', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(verified({ finalResult: 'manual_review' }));
+          await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(verified({ finalResult: 'failed', reason: 'face mismatch' }));
+          await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(verified({ finalResult: null, status: 'AWAITING_BACK' }));
+          await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+
+          expect(vault.storeAutoAudit).not.toHaveBeenCalled();
+        });
+
+        it('keeps nothing when it lost the race to close the dossier (the stored row wins)', async () => {
+          const verification = makeVerification();
+          repo.update.mockResolvedValue({ affected: 0 });
+          repo.findOne.mockResolvedValue(makeVerification({ status: KycStatus.FAILED }));
+          idswyft.getStatus.mockResolvedValue(verified());
+
+          await service.refreshFromProvider(verification as never);
+
+          expect(vault.storeAutoAudit).not.toHaveBeenCalled();
+        });
+
+        it('does not let a failure to keep it change the verdict, and logs no value', async () => {
+          const logs: string[] = [];
+          for (const level of ['log', 'warn', 'error'] as const) {
+            jest.spyOn(Logger.prototype, level).mockImplementation((message: unknown) => void logs.push(String(message)));
+          }
+          vault.storeAutoAudit.mockRejectedValue(new Error('db down'));
+          const verification = makeVerification();
+          idswyft.getStatus.mockResolvedValue(verified());
+
+          await service.refreshFromProvider(verification as never);
+
+          expect(verification.status).toBe(KycStatus.VERIFIED);
+          expect(logs.join('\n')).toContain('kyc auto audit not kept');
+          expect(logs.join('\n')).not.toContain('0.905');
+        });
+
+        it('says why nothing was kept when there is no encryption key, and still verifies', async () => {
+          const logs: string[] = [];
+          jest.spyOn(Logger.prototype, 'warn').mockImplementation((message: unknown) => void logs.push(String(message)));
+          vault.canStore = false;
+          vault.storeAutoAudit.mockResolvedValue(false);
+          const verification = makeVerification();
+          idswyft.getStatus.mockResolvedValue(verified());
+
+          await service.refreshFromProvider(verification as never);
+
+          expect(verification.status).toBe(KycStatus.VERIFIED);
+          expect(logs.join('\n')).toContain('reason=no_encryption_key');
+        });
+
+        it('is not in what the holder gets', async () => {
+          repo.findOne.mockResolvedValue(makeVerification());
+          idswyft.getStatus.mockResolvedValue(verified());
+          const view = await service.uploadStep(USER, 'kyc-1', 'selfie', photo);
+          expect(JSON.stringify(view)).not.toMatch(/audit|sandbox|0.905|threshold/i);
+        });
+
+        it('tolerates an older provider answer without the audit', async () => {
+          const verification = makeVerification();
+          idswyft.getStatus.mockResolvedValue({ verificationId: PROVIDER_ID, status: 'COMPLETE', finalResult: 'verified', reason: null, retryAvailable: false });
+          await service.refreshFromProvider(verification as never);
+          expect(verification.status).toBe(KycStatus.VERIFIED);
+          expect(vault.storeAutoAudit).not.toHaveBeenCalled();
+        });
       });
 
       it('marks a provider manual_review with its origin', async () => {

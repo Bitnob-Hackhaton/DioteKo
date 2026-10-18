@@ -19,9 +19,32 @@ export enum KycStatus {
 export const KYC_REVIEW_ORIGINS = ['provider', 'fallback', 'manual_only'] as const;
 export type KycReviewOrigin = (typeof KYC_REVIEW_ORIGINS)[number];
 
+/**
+ * What the console shows as the origin of a dossier. The stored `review_origin` values plus `auto`: a dossier the provider
+ * verified by itself (status `verified`, `review_origin` NULL). `auto` is derived, never written: no migration, and the rows
+ * verified before the audit existed show up too (with no scores kept).
+ */
+export const KYC_AUTO_ORIGIN = 'auto';
+export const KYC_REVIEW_VIEW_ORIGINS = [...KYC_REVIEW_ORIGINS, KYC_AUTO_ORIGIN] as const;
+export type KycReviewViewOrigin = (typeof KYC_REVIEW_VIEW_ORIGINS)[number];
+
 /** Sides of a document dossier an agent can look at. */
 export const KYC_DOCUMENT_KINDS = ['front', 'back', 'selfie'] as const;
 export type KycDocumentKind = (typeof KYC_DOCUMENT_KINDS)[number];
+
+/**
+ * `kyc_documents.kind` of the encrypted automatic-check assessment (what the provider read and how it scored). Not a
+ * photo: deliberately absent from `KYC_DOCUMENT_KINDS`, so it is never listed as a side, never served by the photo route
+ * and never counted among the photos an agent needs. Same table, same key, same deletion moments as the photos.
+ */
+export const KYC_ASSESSMENT_KIND = 'assessment';
+
+/**
+ * `kyc_documents.kind` of the reduced, PII-free audit record of a dossier the provider verified by itself (scores, flags,
+ * no photo, no OCR text, no name). Written after the photos and the full assessment are deleted; lives until `expires_at`
+ * (`KYC_DOC_RETENTION_DAYS`). Not in `KYC_DOCUMENT_KINDS`, for the same reasons as `assessment`.
+ */
+export const KYC_AUTO_AUDIT_KIND = 'auto_audit';
 
 /** Photos an agent needs to decide a dossier (the back exists for a national id only). */
 export const kycRequiredKinds = (documentType: string): KycDocumentKind[] =>

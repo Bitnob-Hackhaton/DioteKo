@@ -1,12 +1,14 @@
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, IsNull, Not, Repository } from 'typeorm';
+import { FindOptionsWhere, In, IsNull, Not, Repository } from 'typeorm';
 import { AccessLogAction, AccessLogActorType, AccessLogResult } from '../../consent/entities/access-log.entity';
 import { AccessLogService } from '../../consent/services/access-log.service';
 import { AccountStatus, User } from '../../identity/entities/user.entity';
-import { KycReviewDecision, ListKycReviewsQueryDto } from '../dto/kyc-review.dto';
+import { KycReviewDecision, KycReviewListStatus, ListKycReviewsQueryDto } from '../dto/kyc-review.dto';
 import { KycVerification } from '../entities/kyc-verification.entity';
-import { KycDocumentKind, kycRequiredKinds, KycReviewOrigin, KycStatus } from '../kyc.constants';
+import { assessmentHasReadings, KycAssessmentView } from '../kyc-assessment.util';
+import { KycAutoAuditView } from '../kyc-auto-audit.util';
+import { KYC_AUTO_ORIGIN, KycDocumentKind, kycRequiredKinds, KycReviewViewOrigin, KycStatus } from '../kyc.constants';
 import { KycDocumentVaultService } from './kyc-document-vault.service';
 
 const DOCUMENT_LABELS: Record<string, string> = {
@@ -14,22 +16,34 @@ const DOCUMENT_LABELS: Record<string, string> = {
   passport: 'Passeport',
 };
 
-/** What the console shows. Staff-only: it carries the holder's name, never a document number or an image. */
+/**
+ * What the console shows. Staff-only: it carries the holder's name and, on the detail route only, what the automatic
+ * check read on the document (`assessment`, decrypted for this request). Never an image: those are served apart.
+ */
 export interface KycReviewView {
   id: string;
   reference: string;
   holderName: string;
-  origin: KycReviewOrigin;
+  origin: KycReviewViewOrigin;
   documentType: string | null;
   issuingCountry: string | null;
   status: KycStatus;
   failureReason: string | null;
   createdAt: Date;
+  /** Set for a verified dossier. */
+  verifiedAt?: Date;
   availableDocuments: KycDocumentKind[];
   attempts: number;
   reviewedByName?: string;
   reviewedAt?: Date;
   reviewNote?: string;
+  /** Detail route only, for a dossier waiting for a decision. Never in the list, never in a holder-facing view. */
+  assessment?: KycAssessmentView;
+  /**
+   * Detail route only, for a dossier the provider verified by itself (origin `auto`): scores and flags, no photo, no OCR
+   * text, no name (docs/KYC.md §17). Read-only: there is nothing to decide.
+   */
+  autoAudit?: KycAutoAuditView;
 }
 
 /**
@@ -52,19 +66,22 @@ export class KycReviewService {
   ) {}
 
   async list(actorUserId: string, query: ListKycReviewsQueryDto): Promise<{ items: KycReviewView[]; total: number; page: number; pageSize: number }> {
-    this.logger.log(`[START] kyc review list actorUserId=${actorUserId} status=${query.status ?? 'manual_review'} origin=${query.origin ?? 'any'}`);
+    const status = query.status ?? 'manual_review';
+    this.logger.log(`[START] kyc review list actorUserId=${actorUserId} status=${status} origin=${query.origin ?? 'any'}`);
     await this.assertStaff(actorUserId);
     await this.vault.purgeExpired().catch(() => undefined);
 
-    // History (verified / rejected) only lists dossiers an agent was involved in, never every provider-verified holder.
-    const where: FindOptionsWhere<KycVerification> = {
-      status: (query.status ?? KycStatus.MANUAL_REVIEW) as KycStatus,
-      reviewOrigin: query.origin ?? Not(IsNull()),
-    };
+    const where = this.listWhere(status, query.origin);
+    if (!where) {
+      // e.g. origin `auto` among the dossiers to review: no such dossier can exist.
+      this.logger.log('[RESULT] kyc review list count=0 total=0 (filters cannot match)');
+      return { items: [], total: 0, page: Math.floor(query.offset / query.limit) + 1, pageSize: query.limit };
+    }
     const [rows, total] = await this.verificationsRepository.findAndCount({
       where,
       relations: { user: true, reviewer: true },
-      order: { createdAt: 'ASC', id: 'ASC' },
+      // The work queue is served oldest first (first come, first served); every other view is a history, newest first.
+      order: status === 'manual_review' ? { createdAt: 'ASC', id: 'ASC' } : { createdAt: 'DESC', id: 'DESC' },
       take: query.limit,
       skip: query.offset,
     });
@@ -73,11 +90,56 @@ export class KycReviewService {
     return { items, total, page: Math.floor(query.offset / query.limit) + 1, pageSize: query.limit };
   }
 
+  /**
+   * What each state of the list shows. A dossier waiting for a decision or rejected is listed only if an agent was involved
+   * (`review_origin` set); a verified one is listed whoever verified it: with `review_origin` set an agent (or the
+   * fallback) was involved, with it NULL the provider verified it by itself (origin `auto`, read-only). `null` = nothing can match.
+   */
+  private listWhere(status: KycReviewListStatus, origin: KycReviewViewOrigin | undefined): FindOptionsWhere<KycVerification> | FindOptionsWhere<KycVerification>[] | null {
+    if (origin === KYC_AUTO_ORIGIN) {
+      return status === 'verified' || status === 'all' ? { status: KycStatus.VERIFIED, reviewOrigin: IsNull() } : null;
+    }
+    if (origin) {
+      const statuses = status === 'all' ? In([KycStatus.MANUAL_REVIEW, KycStatus.VERIFIED, KycStatus.REJECTED]) : (status as KycStatus);
+      return { status: statuses, reviewOrigin: origin };
+    }
+    if (status === 'verified') return { status: KycStatus.VERIFIED };
+    if (status === 'all') {
+      return [{ status: In([KycStatus.MANUAL_REVIEW, KycStatus.REJECTED]), reviewOrigin: Not(IsNull()) }, { status: KycStatus.VERIFIED }];
+    }
+    return { status: status as KycStatus, reviewOrigin: Not(IsNull()) };
+  }
+
   async get(actorUserId: string, id: string): Promise<KycReviewView> {
     await this.assertStaff(actorUserId);
     const row = await this.findReviewable(id);
-    await this.audit(actorUserId, row, AccessLogAction.READ, AccessLogResult.VALID, { holderUserId: row.userId });
-    return this.toView(row);
+    const view = await this.toView(row);
+    // The assessment is personal data read on a document: opening the dossier is audited with its state (never its content).
+    if (row.status === KycStatus.MANUAL_REVIEW) view.assessment = await this.loadAssessment(row);
+    // Verified by the provider alone: the reduced audit (scores and flags only), opened read-only and audited like the rest.
+    if (view.origin === KYC_AUTO_ORIGIN) {
+      const audit = await this.vault.readAutoAudit(row.id);
+      view.autoAudit = audit ? { state: 'available', audit } : { state: 'unavailable', audit: null };
+    }
+    await this.audit(actorUserId, row, AccessLogAction.READ, AccessLogResult.VALID, {
+      holderUserId: row.userId,
+      ...(view.assessment ? { assessment: view.assessment.state } : {}),
+      ...(view.autoAudit ? { autoAudit: view.autoAudit.state } : {}),
+    });
+    return view;
+  }
+
+  /**
+   * What the automatic check produced for this dossier, decrypted. Four states, so the agent never faces an empty form
+   * without knowing why: `available` (readings), `no_data` (the provider answered but read nothing, maybe with a
+   * rejection code), `unavailable` (nothing kept: outage, expired, key rotated, flag off) and `not_run` (manual-only
+   * mode: there was no automatic check).
+   */
+  private async loadAssessment(row: KycVerification): Promise<KycAssessmentView> {
+    if (row.reviewOrigin === 'manual_only') return { state: 'not_run', assessment: null };
+    const assessment = await this.vault.readAssessment(row.id);
+    if (!assessment) return { state: 'unavailable', assessment: null };
+    return { state: assessmentHasReadings(assessment) ? 'available' : 'no_data', assessment };
   }
 
   /** One decrypted side for the agent's eyes. Audited: who looked at which holder's document. */
@@ -159,8 +221,9 @@ export class KycReviewService {
   }
 
   private async findReviewable(id: string): Promise<KycVerification> {
+    // Reviewable = an agent was involved, or the provider verified it by itself (read-only: `decide` refuses it with 409).
     const row = await this.verificationsRepository.findOne({
-      where: { id, reviewOrigin: Not(IsNull()) },
+      where: [{ id, reviewOrigin: Not(IsNull()) }, { id, status: KycStatus.VERIFIED }],
       relations: { user: true, reviewer: true },
     });
     if (!row) throw new NotFoundException('Verification not found');
@@ -172,12 +235,13 @@ export class KycReviewService {
       id: row.id,
       reference: `KYC-${row.id.slice(0, 8).toUpperCase()}`,
       holderName: row.user?.displayName ?? row.user?.email ?? '—',
-      origin: row.reviewOrigin ?? 'provider',
+      origin: row.reviewOrigin ?? (row.status === KycStatus.VERIFIED ? KYC_AUTO_ORIGIN : 'provider'),
       documentType: DOCUMENT_LABELS[row.documentType] ?? row.documentType,
       issuingCountry: row.issuingCountry,
       status: row.status,
       failureReason: row.failureReason,
       createdAt: row.createdAt,
+      ...(row.status === KycStatus.VERIFIED && row.verifiedAt ? { verifiedAt: row.verifiedAt } : {}),
       availableDocuments: await this.vault.kindsFor(row.id),
       attempts: row.attempts,
       ...(row.reviewer ? { reviewedByName: row.reviewer.displayName ?? row.reviewer.email ?? 'Agent' } : {}),

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
+import { KycAssessment, parseAssessment } from '../kyc-assessment.util';
+import { KycAutoAudit, parseAutoAudit } from '../kyc-auto-audit.util';
 
 /** Upper bound for a status read or a session initialisation. */
 export const IDSWYFT_REQUEST_TIMEOUT_MS = 45000;
@@ -51,7 +53,11 @@ export class IdswyftApiError extends Error {
   }
 }
 
-/** Only the fields of `GET /api/v2/verify/:id/status` we keep: no `ocr_data`, `barcode_data` or risk details. */
+/**
+ * What we keep of `GET /api/v2/verify/:id/status`. The scalar fields are safe to log. `assessment` carries what the
+ * automatic check READ (`ocr_data`: personal data) and how it scored: it goes to the encrypted vault only, never to a
+ * log, a holder-facing view or a webhook row. `barcode_data` is still dropped.
+ */
 export interface IdswyftStatusView {
   /** The `verification_id` echoed by the provider; the caller checks it is the one it asked about. */
   verificationId: string | null;
@@ -62,6 +68,10 @@ export interface IdswyftStatusView {
   /** Short provider reason (code or sentence) when failed / sent to review; `null` otherwise. */
   reason: string | null;
   retryAvailable: boolean;
+  /** OCR fields as read, confidences, scores and the stable rejection code; `null` when the answer carries none of it. PII. */
+  assessment: KycAssessment | null;
+  /** Scores, thresholds and flags only (no OCR text, no name): what is kept for a dossier the provider verifies by itself. */
+  autoAudit?: KycAutoAudit | null;
 }
 
 /**
@@ -128,6 +138,8 @@ export class IdswyftHttpClientService {
       finalResult: text(data?.final_result),
       reason: text(data?.failure_reason) ?? text(data?.rejection_reason) ?? text(data?.manual_review_reason),
       retryAvailable: data?.retry_available === true,
+      assessment: parseAssessment(data, new Date()),
+      autoAudit: parseAutoAudit(data, new Date()),
     };
   }
 
