@@ -216,7 +216,7 @@ Utilise `@web-scraper` quand l'information est dans une page rendue en JavaScrip
 
 ```
 @web-scraper lis http://localhost:8000/api/docs et résume les endpoints
-@web-scraper lis http://localhost:8086 et dis-moi ce que la page affiche
+@web-scraper lis http://localhost:8087 et dis-moi ce que la page affiche
 ```
 
 **À savoir :**

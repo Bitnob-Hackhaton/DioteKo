@@ -11,7 +11,7 @@
 Appwrite + Google, émission de DID / Verifiable Credentials et revue par un agent (hackathon
 Africa DID 2026). Stack réelle :
 
-- `backend-nest/` — **backend actif** : NestJS 11 + TypeORM + PostgreSQL, port 3001, préfixe
+- `backend-nest/` — **backend actif** : NestJS 11 + TypeORM + PostgreSQL, port 3003, préfixe
   `/api` (sonde `GET /api/healthz`). Identité Appwrite + Google (JWT émis par Nest), paiements
   Bitnob (pay-in Lightning + payouts), DID / VC, flux `admin-certificates` (revue par un agent
   avant paiement pour les types qui l'exigent, émission automatique après paiement, PDF à lien
@@ -19,7 +19,7 @@ Africa DID 2026). Stack réelle :
 - `frontmobile/` — Expo Router + React Native (wallet mobile citoyen). Appelle
   `/admin-certificates/*` et les routes d'identité `/auth/*` de Nest.
 - `frontweb/` — console de l'organisation (agents et administrateurs), appelle Nest.
-- `docker-compose.dev.yml` (racine) — stack dev : PostgreSQL (`dioteko-postgres`, port hôte 5435),
+- `docker-compose.dev.yml` (racine) — stack dev : PostgreSQL (`dioteko-postgres-bitnob`, port hôte 5442),
   `backend-nest`, Appwrite auto-hébergé, et le moteur KYC Idswyft (`docker/idswyft/`).
 
 Bitnob Lightning est le seul encaissement ; le module `lightning` est le registre des factures.
@@ -569,7 +569,7 @@ dans `.claude/agents/feat/` et `.claude/HOW_TO_USE_AGENTS.md`.
 @integration-analyst verify Appwrite's current OAuth2/JWT flow before wiring the login endpoint
 
 # Lire une page ou une instance locale (Playwright)
-@web-scraper lis http://localhost:8000/api/docs et résume les endpoints
+@web-scraper lis http://localhost:8010/api/docs et résume les endpoints
 
 # Feature sur un domaine mobile spécifique
 @feat-certificates add a status badge to all-certificates.tsx

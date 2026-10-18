@@ -16,7 +16,7 @@ Check `package.json` before you suggest one. Full reference: `docs/TESTING.md`.
 Real commands:
 - `backend-nest/` (NestJS):
   - `npm test`: Jest unit specs under `src/`, about 150 specs, no database.
-  - `npm run test:e2e`: Jest E2E under `test/`, against the real Postgres database `dioteko_test`.
+  - `npm run test:e2e`: Jest E2E under `test/`, against the real Postgres database `dioteko_test_bitnob`.
     It sets `NODE_ENV=test`, runs `migration:run` and the seed first, and runs `--runInBand`.
     Requires the stack running (`npm run dev:up` at the repo root).
   - `npm run typecheck`: `tsc --noEmit`.
@@ -32,7 +32,7 @@ Mapping (changed path to smallest scope):
 |---|---|
 | `backend-nest/src/modules/<module>/` | `npm test -- <module>` (its unit specs) |
 | `backend-nest/src/modules/<module>/controllers/` or `app.module.ts` or `common/` | the unit specs above, then `npm run test:e2e` if a route or guard changed |
-| `backend-nest/src/database/migrations/` or entities | `migration:run` and `migration:revert` on `dioteko_test`, then `npm run test:e2e` |
+| `backend-nest/src/database/migrations/` or entities | `migration:run` and `migration:revert` on `dioteko_test_bitnob`, then `npm run test:e2e` |
 | `backend-nest/src/config/` or `env.validation.ts` | `npm test` (config specs), then `npm run typecheck` |
 | `frontmobile/` | `npm run lint` in `frontmobile/` |
 | `frontweb/` | `npm test` and `npm run lint` in `frontweb/` |

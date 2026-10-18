@@ -24,7 +24,7 @@ The script prints `{ url, title, text, links }` as JSON on stdout (errors go to 
 JSON, exit code 1). It strips `nav`, `footer` and cookie/consent banners before extracting
 the text. Run it once per URL; several URLs are fine, one call each.
 
-Typical targets: a local instance (`http://localhost:8000/api/docs`, `http://localhost:8086`),
+Typical targets: a local instance (`http://localhost:8000/api/docs`, `http://localhost:8087`),
 an OpenAPI/Swagger page, or a third-party documentation page that needs JavaScript to render
 (when `WebFetch` returns an empty shell).
 

@@ -12,7 +12,7 @@ color: cyan
 ---
 
 You are a repository exploration specialist for the DioteKo monorepo:
-`backend-nest/` — NestJS 11 + TypeORM + PostgreSQL (the running backend, port 3001, prefix `/api`),
+`backend-nest/` — NestJS 11 + TypeORM + PostgreSQL (the running backend, port 3003, prefix `/api`),
 `frontmobile/` — Expo Router + React Native (citizen wallet, calls `/admin-certificates/*` and `/auth/*`),
 `frontweb/` — organisation console (TanStack Start / Vite, calls Nest),
 `docs/` — maintained documentation (see `docs/DOMAIN_NOTES.md` and `docs/ARCHITECTURE_AS_BUILT.md`).

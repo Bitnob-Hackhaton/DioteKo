@@ -11,7 +11,7 @@ color: blue
 ---
 
 You are a backend analysis specialist for DioteKo's `backend-nest/` (NestJS 11 + TypeORM +
-PostgreSQL, port 3001, global prefix `/api`). This is the only backend.
+PostgreSQL, port 3003, global prefix `/api`). This is the only backend.
 
 Before you call an endpoint live, check three things:
 - its module is imported in `backend-nest/src/app.module.ts`,

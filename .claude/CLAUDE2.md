@@ -8,10 +8,10 @@ integrations). This note keeps only what an agent must know before touching the 
 
 ## 1. What runs
 
-- **Active backend:** `backend-nest/`, NestJS 11 + TypeORM 0.3 + PostgreSQL. Port 3001 (`PORT`), global prefix
+- **Active backend:** `backend-nest/`, NestJS 11 + TypeORM 0.3 + PostgreSQL. Port 3003 (`PORT`), global prefix
   `/api`, liveness probe `GET /api/healthz`, Swagger UI at `/api-docs` (`src/main.ts`).
 - **Database:** `dioteko-postgres` (PostgreSQL 18) from `docker-compose.dev.yml`, host port 5435
-  (`DIOTEKO_PG_HOST_PORT`). Databases: `dioteko_dev`, `dioteko_test`, `dioteko_prod` (placeholder, never created
+  (`DIOTEKO_PG_HOST_PORT`). Databases: `dioteko_dev_bitnob`, `dioteko_test_bitnob`, `dioteko_prod` (placeholder, never created
   locally). Schema changes only through TypeORM migrations in `backend-nest/src/database/migrations/`
   (`up()` and `down()`, `synchronize: false`).
 - **Pay-in:** Bitnob Lightning is the only pay-in rail.

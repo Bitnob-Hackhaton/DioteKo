@@ -25,7 +25,7 @@ Where things are:
   `.env`, `.env.test` or `.env.prod`). `DB_NAME` is required there, with no default.
 - runtime: `synchronize: false` in `src/app.module.ts`. The app never changes the schema by itself.
 - database: `dioteko-postgres` from the root `docker-compose.dev.yml`, host port 5435 by default.
-  Databases: `dioteko_dev` (dev, may hold data), `dioteko_test` (E2E, wiped and re-migrated on every run),
+  Databases: `dioteko_dev_bitnob` (dev, may hold data), `dioteko_test_bitnob` (E2E, wiped and re-migrated on every run),
   `dioteko_prod` (placeholder, not created locally).
 - the seed (`npm run seed`) is a dev and test tool. It is not a data migration.
 - entities: `src/modules/<module>/entities/*.entity.ts`. The table map is in `docs/DATABASE_MODEL.md`.
@@ -45,14 +45,14 @@ Focus on:
 - drift: the SQL must match the entity. Do not trust a hand edit without re-running
   `migration:generate` in a scratch database and comparing the output,
 - ordering: a migration must run after the migration that creates the objects it alters (timestamps),
-- E2E path: `test:e2e:prepare` runs `migration:run` on `dioteko_test` only. Confirm that a change does not
-  make the E2E `global-setup.ts` guard fail (it asserts `DB_NAME=dioteko_test`).
+- E2E path: `test:e2e:prepare` runs `migration:run` on `dioteko_test_bitnob` only. Confirm that a change does not
+  make the E2E `global-setup.ts` guard fail (it asserts `DB_NAME=dioteko_test_bitnob`).
 
 Return:
 - pass or fail per concern above, not a general impression,
 - for any data-loss risk, the safer multi-step alternative,
 - whether reversibility was verified (for example `migration:run` then `migration:revert` on
-  `dioteko_test`) or only assumed. Say which one.
+  `dioteko_test_bitnob`) or only assumed. Say which one.
 
 Illustrations: never use ASCII art (arrows like `↓ │ ├──`, box-drawing
 characters, text trees). Table relationships or a step-by-step migration plan,
