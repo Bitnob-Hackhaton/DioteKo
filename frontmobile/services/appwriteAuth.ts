@@ -88,7 +88,7 @@ function mapAppwriteError(error: AppwriteException): string {
     return "Service d'authentification indisponible (version incompatible).";
   }
   if (error.code === 401 || error.code === 403) {
-    return 'Connexion Google refusee. Reessaie.';
+    return 'Connexion Google refusée. Reessaie.';
   }
   if (error.code === 429) {
     return 'Trop de tentatives. Reessaie dans un instant.';
@@ -123,7 +123,7 @@ export async function signInWithGoogle(): Promise<GoogleSession> {
     devLog('[Google] browser auth result', { type: authResult.type });
 
     if (authResult.type !== 'success') {
-      throw new Error('Connexion Google annulee');
+      throw new Error('Connexion Google annulée');
     }
 
     const parsed = Linking.parse(authResult.url);
@@ -209,7 +209,7 @@ export async function signInWithGoogle(): Promise<GoogleSession> {
     }
 
     devError('[Google] unexpected error', error);
-    throw error instanceof Error ? error : new Error('Connexion Google echouee');
+    throw error instanceof Error ? error : new Error('Connexion Google echouée');
   }
 }
 
