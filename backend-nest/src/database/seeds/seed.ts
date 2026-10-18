@@ -31,7 +31,7 @@ async function seed(): Promise<void> {
     throw new Error('[seed] refusing to run with NODE_ENV=production — seed is dev/test only');
   }
 
-  logger.log(`[START] seed (NODE_ENV=${process.env.NODE_ENV ?? 'development'}, DB_NAME=${process.env.DB_NAME ?? 'dioteko_dev'})`);
+  logger.log(`[START] seed (NODE_ENV=${process.env.NODE_ENV ?? 'development'}, DB_NAME=${process.env.DB_NAME ?? 'dioteko_dev_bitnob'})`);
 
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn', 'log'],

@@ -34,7 +34,7 @@ function required(name: string): string {
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
   host: required('DB_HOST'),
-  port: parseInt(process.env.DB_PORT || '5435', 10),
+  port: parseInt(process.env.DB_PORT || '5442', 10),
   username: required('DB_USERNAME'),
   password: required('DB_PASSWORD'),
   database: required('DB_NAME'),

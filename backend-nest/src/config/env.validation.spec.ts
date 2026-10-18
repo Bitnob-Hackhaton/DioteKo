@@ -2,8 +2,8 @@ import 'reflect-metadata';
 import { validate } from './env.validation';
 
 const base = {
-  PORT: '3001',
-  APP_BASE_URL: 'http://localhost:3001',
+  PORT: '3003',
+  APP_BASE_URL: 'http://localhost:3003',
   DB_HOST: 'localhost',
   DB_PORT: '5435',
   DB_USERNAME: 'u',

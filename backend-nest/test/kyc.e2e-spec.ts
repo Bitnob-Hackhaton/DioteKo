@@ -1,5 +1,5 @@
 /**
- * KYC (Idswyft) end to end against the real AppModule and dioteko_test. No Idswyft instance is needed: the
+ * KYC (Idswyft) end to end against the real AppModule and dioteko_test_bitnob. No Idswyft instance is needed: the
  * provider is never reached by these cases (gate, ownership, upload checks, unsigned webhook).
  *
  * `KYC_ENFORCEMENT` is left at its default (on) by the test environment; the cases below depend on it.

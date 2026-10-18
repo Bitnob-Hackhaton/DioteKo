@@ -205,7 +205,7 @@ export function parseReconcileInterval(raw: string | undefined): number {
 
 export default (): AppConfig => ({
   nodeEnv: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT || '3001', 10),
+  port: parseInt(process.env.PORT || '3003', 10),
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS, process.env.NODE_ENV || 'development'),
 
   app: {
@@ -213,15 +213,15 @@ export default (): AppConfig => ({
     // `callback_url` (`${baseUrl}/api/bitnob/webhooks`). Required at
     // boot (see `env.validation.ts`); the HTTPS constraint is only enforced
     // when `bitnob.environment === 'production'` (see `BitnobPayoutsService`).
-    baseUrl: process.env.APP_BASE_URL || 'http://localhost:3001',
+    baseUrl: process.env.APP_BASE_URL || 'http://localhost:3003',
   },
 
   database: {
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5435', 10),
+    port: parseInt(process.env.DB_PORT || '5442', 10),
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
-    name: process.env.DB_NAME || 'dioteko_dev',
+    name: process.env.DB_NAME || 'dioteko_dev_bitnob',
     url: process.env.DATABASE_URL,
   },
 
@@ -306,7 +306,7 @@ export default (): AppConfig => ({
   kyc: {
     // Host-run Nest reaches the dev Idswyft on its published port; the backend container gets
     // http://idswyft-api:3001 from docker-compose.dev.yml.
-    idswyftBaseUrl: process.env.IDSWYFT_BASE_URL || 'http://localhost:8000',
+    idswyftBaseUrl: process.env.IDSWYFT_BASE_URL || 'http://localhost:8010',
     idswyftApiKey: process.env.IDSWYFT_API_KEY || '',
     // Shared secret Idswyft signs webhook deliveries with (HMAC-SHA256, `X-Idswyft-Signature`). Empty + production
     // => the guard rejects every delivery (fail closed); empty + non-prod => verification is skipped.

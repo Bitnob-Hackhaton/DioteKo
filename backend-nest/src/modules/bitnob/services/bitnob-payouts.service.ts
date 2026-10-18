@@ -294,7 +294,7 @@ export class BitnobPayoutsService {
    * — Bitnob delivers every event family to one URL) and validates it. A
    * malformed `APP_BASE_URL` is a 500 (server misconfiguration, not a client
    * error). The HTTPS requirement only bites in `production` — local dev with
-   * `BITNOB_ENVIRONMENT=sandbox` may use `http://localhost:3001`.
+   * `BITNOB_ENVIRONMENT=sandbox` may use `http://localhost:3003`.
    */
   private buildAndValidateCallbackUrl(): string {
     const appBaseUrl = this.config.get<string>('app.baseUrl', '');

@@ -2,7 +2,7 @@
  * Reference E2E pattern — copy this for Bitnob / certificates / verification
  * suites.
  *
- *   beforeAll   boot the real AppModule against dioteko_test (migrations already
+ *   beforeAll   boot the real AppModule against dioteko_test_bitnob (migrations already
  *               applied by test/global-setup.ts)
  *   beforeEach  resetAndSeed — TRUNCATE every table + re-apply the shared
  *               baseline, so tests are order-independent

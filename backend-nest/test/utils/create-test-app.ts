@@ -4,7 +4,7 @@
  * `applyGlobalAppConfig`, same `rawBody: true`).
  *
  * Connects to whatever `AppModule`'s TypeOrmModule resolves — which, under
- * NODE_ENV=test, is `dioteko_test` (see src/config/env-files.ts). `globalSetup`
+ * NODE_ENV=test, is `dioteko_test_bitnob` (see src/config/env-files.ts). `globalSetup`
  * has already migrated it; call `resetAndSeed` in a `beforeEach`.
  */
 import { INestApplication } from '@nestjs/common';
@@ -22,9 +22,9 @@ export async function createTestApp(): Promise<TestAppContext> {
   if (process.env.NODE_ENV !== 'test') {
     throw new Error('[e2e] createTestApp called without NODE_ENV=test');
   }
-  if (process.env.DB_NAME !== 'dioteko_test') {
+  if (process.env.DB_NAME !== 'dioteko_test_bitnob') {
     throw new Error(
-      `[e2e] createTestApp: DB_NAME="${process.env.DB_NAME ?? 'undefined'}" is not the test DB ("dioteko_test"). ` +
+      `[e2e] createTestApp: DB_NAME="${process.env.DB_NAME ?? 'undefined'}" is not the test DB ("dioteko_test_bitnob"). ` +
         'Copy backend-nest/.env.test.example to backend-nest/.env.test.',
     );
   }

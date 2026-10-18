@@ -1,5 +1,5 @@
 /**
- * KYC manual review (docs/PLAN_KYC_MANUAL_REVIEW.md) end to end against the real AppModule and dioteko_test, in
+ * KYC manual review (docs/PLAN_KYC_MANUAL_REVIEW.md) end to end against the real AppModule and dioteko_test_bitnob, in
  * `manual_only` mode so Idswyft is never reached: the holder sends the photos, an agent decides, the gate follows.
  * The flags are set before the app boots (the config is read once).
  */

@@ -36,7 +36,7 @@ function makeConfigStub(): ConfigService {
     'bitnob.clientSecret': process.env.BITNOB_CLIENT_SECRET,
     'bitnob.baseUrl': process.env.BITNOB_BASE_URL || 'https://api.bitnob.com',
     'bitnob.environment': process.env.BITNOB_ENVIRONMENT || 'sandbox',
-    'app.baseUrl': process.env.APP_BASE_URL || 'http://localhost:3001',
+    'app.baseUrl': process.env.APP_BASE_URL || 'http://localhost:3003',
   };
   return {
     get: (key: string, defaultValue?: unknown): unknown =>

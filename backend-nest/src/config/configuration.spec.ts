@@ -182,7 +182,7 @@ describe('KYC settings', () => {
     const previous = process.env.IDSWYFT_BASE_URL;
     delete process.env.IDSWYFT_BASE_URL;
     try {
-      expect(configuration().kyc.idswyftBaseUrl).toBe('http://localhost:8000');
+      expect(configuration().kyc.idswyftBaseUrl).toBe('http://localhost:8010');
     } finally {
       if (previous !== undefined) process.env.IDSWYFT_BASE_URL = previous;
     }

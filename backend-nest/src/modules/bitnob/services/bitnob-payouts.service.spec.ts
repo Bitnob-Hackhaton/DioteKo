@@ -17,7 +17,7 @@ function envelope<T>(data: T) {
 function makeConfig(overrides: Record<string, string> = {}): ConfigService {
   const values: Record<string, string> = {
     'bitnob.environment': 'sandbox',
-    'app.baseUrl': 'http://localhost:3001',
+    'app.baseUrl': 'http://localhost:3003',
     ...overrides,
   };
   return {
@@ -98,7 +98,7 @@ describe('BitnobPayoutsService', () => {
         quote_id: 'QT2_21052226',
         reference: 'dkpayout_abc',
         payment_reason: 'certificate_service_fee',
-        callback_url: 'http://localhost:3001/api/bitnob/webhooks',
+        callback_url: 'http://localhost:3003/api/bitnob/webhooks',
         beneficiary: {
           destination_type: 'bank',
           country: 'NG',

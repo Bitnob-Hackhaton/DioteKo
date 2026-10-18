@@ -2,9 +2,9 @@
 
 NestJS 11 + TypeORM 0.3 + PostgreSQL API for DioteKo. It is the only backend in use. `frontmobile/` and `frontweb/` both call it.
 
-- Port **3001**, global prefix **`/api`**
+- Port **3003**, global prefix **`/api`**
 - Health probe: `GET /api/healthz` (public, runs `SELECT 1`). `GET /api/health` is a stub for a future domain, not a health check
-- Swagger UI: http://localhost:3001/api-docs (outside the prefix)
+- Swagger UI: http://localhost:3003/api-docs (outside the prefix)
 - Docker image: `node:20-alpine` (`Dockerfile`)
 
 Architecture and flows: [../ARCHITECTURE.md](../ARCHITECTURE.md) and [../docs/ARCHITECTURE_AS_BUILT.md](../docs/ARCHITECTURE_AS_BUILT.md).
@@ -37,11 +37,11 @@ npm install
 cp .env.example .env           # set JWT_SECRET and VC_SIGNING_SECRET
 
 # repo root
-npm run db:setup               # migrations and seed, dioteko_dev and dioteko_test
-curl http://localhost:3001/api/healthz
+npm run db:setup               # migrations and seed, dioteko_dev_bitnob and dioteko_test_bitnob
+curl http://localhost:3003/api/healthz
 ```
 
-Host mode with hot reload (do not run it together with the container, both use port 3001):
+Host mode with hot reload (do not run it together with the container, both use port 3003):
 
 ```bash
 npm run migration:run
@@ -51,7 +51,7 @@ npm run start:dev
 
 **Required variables:** `JWT_SECRET` and `VC_SIGNING_SECRET`. The app refuses to boot if either is empty (`src/config/env.validation.ts`).
 
-**Environment files:** `NODE_ENV` picks the file (`src/config/env-files.ts`): `.env` (development, `dioteko_dev`), `.env.test` (test, `dioteko_test`), `.env.prod` (production, `dioteko_prod`). Templates: `.env.example`, `.env.test.example`, `.env.prod.example`. Real `.env*` files are gitignored.
+**Environment files:** `NODE_ENV` picks the file (`src/config/env-files.ts`): `.env` (development, `dioteko_dev_bitnob`), `.env.test` (test, `dioteko_test_bitnob`), `.env.prod` (production, `dioteko_prod`). Templates: `.env.example`, `.env.test.example`, `.env.prod.example`. Real `.env*` files are gitignored.
 
 The full variable list, with comments, is in [.env.example](.env.example). See also [../SETUP.md](../SETUP.md).
 
@@ -63,7 +63,7 @@ The full variable list, with comments, is in [.env.example](.env.example). See a
 | `npm run build` | Compile with Nest CLI |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Jest unit tests, no database |
-| `npm run test:e2e` | E2E tests against `dioteko_test`. See [../docs/TESTING.md](../docs/TESTING.md) |
+| `npm run test:e2e` | E2E tests against `dioteko_test_bitnob`. See [../docs/TESTING.md](../docs/TESTING.md) |
 | `npm run migration:run`, `npm run migration:revert` | Apply or roll back migrations |
 | `npm run migration:generate -- src/database/migrations/<Name>` | Generate a migration from entity changes |
 | `npm run seed` | Idempotent baseline: roles, one demo organisation, demo accounts. Refuses `NODE_ENV=production` |
@@ -91,4 +91,4 @@ Bitnob Lightning is the only pay-in. The `lightning` module is the invoice and p
 ## Tests
 
 - `npm test` runs the Jest unit suite without a database.
-- `npm run test:e2e` runs against `dioteko_test`. It uses `NODE_ENV=test` and a separate env file. Check [../docs/TESTING.md](../docs/TESTING.md) first.
+- `npm run test:e2e` runs against `dioteko_test_bitnob`. It uses `NODE_ENV=test` and a separate env file. Check [../docs/TESTING.md](../docs/TESTING.md) first.

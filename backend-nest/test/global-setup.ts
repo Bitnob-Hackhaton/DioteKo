@@ -3,7 +3,7 @@
  *
  *  1. Hard-guard the target database — NODE_ENV must be "test" AND the
  *     resolved DB_NAME must be the test DB. A missing `.env.test` makes
- *     dotenv a silent no-op and DB_NAME would fall back to `dioteko_dev`;
+ *     dotenv a silent no-op and DB_NAME would fall back to `dioteko_dev_bitnob`;
  *     without this check `globalSetup` + every `beforeEach` TRUNCATE would
  *     then wipe the dev database. This is the single worst E2E pitfall.
  *  2. Apply migrations to the test DB (idempotent — TypeORM skips already-run
@@ -16,7 +16,7 @@ import { execSync } from 'child_process';
 import * as dotenv from 'dotenv';
 import { envFilePathForNodeEnv } from '../src/config/env-files';
 
-const EXPECTED_DB = 'dioteko_test';
+const EXPECTED_DB = 'dioteko_test_bitnob';
 
 export default function globalSetup(): void {
   if (process.env.NODE_ENV !== 'test') {

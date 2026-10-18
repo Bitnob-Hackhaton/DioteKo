@@ -10,9 +10,9 @@
  * All three run with cwd = `backend-nest/`, so the returned path is resolved
  * relative to that directory.
  *
- *   NODE_ENV=test         -> .env.test   (E2E suite, `dioteko_test`)
+ *   NODE_ENV=test         -> .env.test   (E2E suite, `dioteko_test_bitnob`)
  *   NODE_ENV=production    -> .env.prod   (deploy only — not used locally)
- *   development / unset    -> .env        (day-to-day dev, `dioteko_dev`)
+ *   development / unset    -> .env        (day-to-day dev, `dioteko_dev_bitnob`)
  */
 export function envFilePathForNodeEnv(nodeEnv: string | undefined = process.env.NODE_ENV): string {
   switch (nodeEnv) {

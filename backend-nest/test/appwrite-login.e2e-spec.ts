@@ -8,7 +8,7 @@
  * are set in .env.test.
  *
  * To enable:
- *   1. `npm run dev:up` (starts local Appwrite on host port 8090)
+ *   1. `npm run dev:up` (starts local Appwrite on host port 9000)
  *   2. one-time console setup (docs/DEV_WORKFLOW.md "Appwrite first-run")
  *   3. fill APPWRITE_PROJECT_ID / APPWRITE_API_KEY / APPWRITE_TEST_USER_* in .env.test
  *   4. `npm run seed:appwrite`
@@ -26,7 +26,7 @@ import { resetAndSeed } from './utils/reset-database';
 const enabled = Boolean(process.env.APPWRITE_API_KEY && process.env.APPWRITE_PROJECT_ID);
 const describeMaybe = enabled ? describe : describe.skip;
 
-const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT ?? 'http://localhost:8090/v1').replace(/\/$/, '');
+const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT ?? 'http://localhost:9000/v1').replace(/\/$/, '');
 const PROJECT_ID = process.env.APPWRITE_PROJECT_ID ?? '';
 
 async function mintClientJwt(email: string, password: string): Promise<string> {

@@ -40,7 +40,7 @@ class EnvironmentVariables {
   @IsInt()
   @Min(0)
   @Max(65535)
-  PORT: number = 3001;
+  PORT: number = 3003;
 
   // Public origin of this API — required at boot. Feeds the Bitnob payout
   // `callback_url`; the HTTPS constraint on that URL is only enforced when
