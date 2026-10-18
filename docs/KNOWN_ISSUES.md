@@ -260,3 +260,9 @@ The end-to-end Google/Appwrite login flow has **not been tested on a real device
 The mobile app has no test runner or simulator available in this environment — only
 `npx expo lint`/typecheck run. Manual verification on a real device/simulator, plus the
 Appwrite credentials above, is still needed before this ships.
+
+### Inscription email + mot de passe : email non vérifié (2026-10-18)
+
+- `POST /api/auth/register` crée des comptes avec `emailVerified=false` : il n'y a pas d'SMTP. Un tiers peut inscrire l'email d'autrui ; la victime a un 409 en se connectant avec Google (`completeAppwriteLogin`). Voir `docs/DECISIONS.md`.
+- Pas de récupération de mot de passe, pas de limiteur par email sur `login` (seul le throttle par IP existe).
+- Le conteneur `backend-nest` doit être reconstruit pour exposer la route (`docker compose restart` ne suffit pas).
