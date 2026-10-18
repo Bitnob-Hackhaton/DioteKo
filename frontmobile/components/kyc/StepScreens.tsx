@@ -273,10 +273,10 @@ export const ResultScreen = ({
         ? {
             icon: 'clock.fill',
             color: colors['state.warning.fg'],
-            title: 'Dossier en cours d’examen',
+            title: 'En attente de vérification par un agent',
             text: agentReview
-              ? 'Vos documents ont bien été reçus. Un agent les vérifiera : vous serez débloqué dès la validation. Vous pouvez quitter cet écran et revenir plus tard.'
-              : 'Un agent examine votre dossier. Cet écran se met à jour tout seul ; vous pouvez le quitter et revenir plus tard.',
+              ? 'Vos documents ont bien été reçus. Votre dossier est en attente de vérification par un agent : vous serez débloqué dès sa validation. Vous pouvez quitter cet écran et revenir plus tard.'
+              : 'Votre dossier est en attente de vérification par un agent. Cet écran se met à jour tout seul ; vous pouvez le quitter et revenir plus tard.',
           }
         : {
             icon: 'xmark.circle.fill',

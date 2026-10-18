@@ -88,7 +88,9 @@ const KycScreen = () => {
   const effective: Phase = phase ?? (serverResult ? 'result' : 'start');
   // Apres l'envoi du selfie, le statut relu par le serveur (ou par le sondage) fait passer du traitement au resultat.
   // A verdict that closes the dossier (rejected / failed) ends the flow wherever the holder is: the provider refuses any further
-  // photo, so offering the next step would only end in an error.
+  // photo, so offering the next step would only end in an error. With the agent fallback on, the server never answers
+  // rejected / failed for a provider verdict: it stays `pending` with a `nextStep` until every photo is kept, then
+  // `manual_review` (the "waiting for an agent" result).
   const closedByProvider = serverResult === 'declined';
   const shown: Phase =
     (effective === 'processing' && serverResult) || (closedByProvider && ['capture', 'selfie-intro', 'review'].includes(effective))
@@ -284,6 +286,15 @@ const KycScreen = () => {
       }
       // Selfie envoye : le serveur a relu le verdict (ou le fera au prochain sondage). Plus de retour possible.
       setKyc(updated);
+      // Dossier confie a un agent (le prestataire a clos sa session) mais une photo precedente n'a pas pu etre gardee : le
+      // serveur la redemande, l'agent ne decide qu'avec toutes les photos. Pas d'ecran de traitement ni de resultat avant.
+      const missingIndex = updated.status === 'pending' && updated.nextStep && updated.nextStep !== 'selfie' ? steps.indexOf(updated.nextStep) : -1;
+      if (missingIndex >= 0) {
+        kycLog('photo missing after selfie', { nextStep: updated.nextStep });
+        setStepIndex(missingIndex);
+        setPhase('capture');
+        return;
+      }
       setPhase('processing');
       discardAll();
       if (updated.status === 'verified') Toast.show({ type: 'success', text1: 'Identité vérifiée' });
