@@ -37,6 +37,12 @@ const EMAIL_TAKEN_MESSAGE = 'An account with this email already exists. Please s
 // (email vs google_id) is unknown, so the message must not name any of them.
 const IDENTITY_CONFLICT_MESSAGE =
   'An account with these details already exists. Please sign in using your original method.';
+// Same neutral wording for password registration: never name the colliding column or the original method.
+const REGISTER_CONFLICT_MESSAGE = 'An account with these details already exists.';
+
+// Compared against when the user (or its hash) is missing, so a login for an unknown
+// email costs the same bcrypt work as a bad password and does not leak account existence by timing.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('dioteko-dummy-password', BCRYPT_SALT_ROUNDS);
 
 /** Postgres unique_violation, surfaced by TypeORM as a QueryFailedError. */
 function isUniqueViolation(error: unknown): boolean {
@@ -213,20 +219,97 @@ export class AuthService {
   }
 
   /**
-   * Conventional login for staff accounts (issuer/verifier/admin
-   * orgs). Seed/admin-created only — no public self-registration.
+   * Public self-registration of a citizen with email + password. Creates a
+   * `holder` only (never another role, never an organization), with
+   * `emailVerified=false` (no SMTP yet), then mints a session exactly like the
+   * Google flow so the mobile app can treat both identically.
+   * An email already held by any user stays a neutral 409 (no auto-link).
    */
-  async login(email: string, password: string): Promise<TokenPair> {
+  async register(
+    email: string,
+    password: string,
+    displayName?: string,
+  ): Promise<TokenPair & { user: AuthUserDto }> {
+    this.logger.log('[START] register');
+
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new ConflictException(REGISTER_CONFLICT_MESSAGE);
+    }
+
+    const existing = await this.usersRepository.findOne({
+      where: { email: Raw((alias) => `lower(trim(${alias})) = :email`, { email: normalizedEmail }) },
+    });
+    if (existing) {
+      this.logger.warn(`[RESULT] register blocked: email already registered to userId=${existing.id}`);
+      throw new ConflictException(REGISTER_CONFLICT_MESSAGE);
+    }
+
+    const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+
+    let user: User;
+    try {
+      user = await this.usersRepository.save(
+        this.usersRepository.create({
+          email: normalizedEmail,
+          phone: null,
+          passwordHash,
+          displayName: displayName?.trim() || null,
+          appwriteUserId: null,
+          googleId: null,
+          emailVerified: false,
+          accountStatus: AccountStatus.ACTIVE,
+          organizationId: null,
+          lastLoginAt: new Date(),
+        }),
+      );
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      // Concurrent registration of the same email won the insert race.
+      this.logger.warn('[RESULT] register blocked: unique collision on create');
+      throw new ConflictException(REGISTER_CONFLICT_MESSAGE);
+    }
+    this.logger.log(`[ENTITY] register created userId=${user.id}`);
+
+    await this.ensureRole(user.id, RoleCode.HOLDER);
+
+    let did = await this.didService.findByController(user.id);
+    if (!did) {
+      did = await this.didService.createDid(user.id);
+      this.logger.log(`[RESULT] created DID for holder userId=${user.id} did=${did.did}`);
+    }
+
+    const roles = await this.getRoleCodes(user.id);
+    const tokens = await this.mintTokens(user, roles, did.did);
+
+    this.logger.log(`[STATE] register complete userId=${user.id} roles=${roles.join(',')}`);
+
+    return { ...tokens, user: toAuthUserDto(user, roles, did.did) };
+  }
+
+  /**
+   * Conventional email+password login: staff accounts (issuer/verifier/admin,
+   * seed/admin-created) and citizens created by `register`. Grants no role and
+   * no DID: it only reads what the account already has.
+   */
+  async login(email: string, password: string): Promise<TokenPair & { user: AuthUserDto }> {
     this.logger.log('[START] login');
 
-    const user = await this.usersRepository.findOne({ where: { email } });
+    const normalizedEmail = normalizeEmail(email);
+    const user = normalizedEmail
+      ? await this.usersRepository.findOne({
+          where: { email: Raw((alias) => `lower(trim(${alias})) = :email`, { email: normalizedEmail }) },
+        })
+      : null;
+
+    // Always run one bcrypt compare, even without a user, to keep the timing uniform.
+    const passwordMatches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
 
     if (!user || !user.passwordHash) {
       this.logger.warn('[RESULT] login failed reason=no_such_user_or_no_password');
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const passwordMatches = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatches) {
       this.logger.warn(`[RESULT] login failed userId=${user.id} reason=bad_password`);
       throw new UnauthorizedException('Invalid email or password');
@@ -239,9 +322,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    user.lastLoginAt = new Date();
+    await this.usersRepository.save(user);
+
     const roles = await this.getRoleCodes(user.id);
+    // Read-only, like `refresh`: staff have no personal DID and must not get one here.
+    const did = await this.didService.findByController(user.id);
+    const tokens = await this.mintTokens(user, roles, did?.did);
     this.logger.log(`[STATE] login success userId=${user.id}`);
-    return this.mintTokens(user, roles);
+    return { ...tokens, user: toAuthUserDto(user, roles, did?.did ?? null) };
   }
 
   /**

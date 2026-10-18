@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { parseDurationToMs } from '../../common/utils/duration.util';
 import { DidVcModule } from '../did-vc/did-vc.module';
@@ -24,6 +25,12 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     // takes plain controllerUserId/controllerOrganizationId strings), so
     // this one-directional import doesn't create a circular module graph.
     DidVcModule,
+    // Only used by the routes that opt in with ThrottlerGuard + @Throttle (AuthController); there is
+    // no global guard. Skipped under NODE_ENV=test so E2E suites that log in repeatedly are not blocked.
+    ThrottlerModule.forRoot({
+      throttlers: [{ name: 'default', ttl: 60_000, limit: 60 }],
+      skipIf: () => process.env.NODE_ENV === 'test',
+    }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

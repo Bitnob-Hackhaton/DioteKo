@@ -10,8 +10,8 @@ export enum AccountStatus {
 /**
  * A person. Can be linked to Appwrite/Google OAuth (`appwriteUserId` + `googleId`, mobile-client
  * holder-side login) and/or have a conventional email+password login
- * (issuer/verifier/admin staff accounts, seed/admin-created only in this
- * pass — see AuthService.login). `googleId` is the Google `sub` (Appwrite
+ * (issuer/verifier/admin staff accounts, seed/admin-created, and citizens via POST /auth/register; see
+ * AuthService.login/register). `googleId` is the Google `sub` (Appwrite
  * identity `providerUid`): set once at first Google login and never
  * overwritten. `emailVerified` mirrors the identity provider's verification
  * at last login; `accountStatus` is the local kill switch checked before any

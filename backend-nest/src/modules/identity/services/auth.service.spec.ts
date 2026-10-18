@@ -360,6 +360,83 @@ describe('AuthService', () => {
       const tokens = await service.login('jane@example.com', 'correct-password');
 
       expect(tokens.accessToken).toBe('signed.access.token');
+      expect(tokens.user.email).toBe('jane@example.com');
+    });
+
+    it('login() grants no role and creates no DID (staff must not become holders)', async () => {
+      const passwordHash = await bcrypt.hash('correct-password', 4);
+      users.findOne.mockResolvedValue(makeUser({ passwordHash }));
+
+      await service.login('jane@example.com', 'correct-password');
+
+      expect(userRoles.save).not.toHaveBeenCalled();
+      expect(didService.createDid).not.toHaveBeenCalled();
+    });
+
+    it('login() of an unknown email fails with the same generic error', async () => {
+      users.findOne.mockResolvedValue(null);
+
+      const error = await service.login('nobody@example.com', 'whatever-password').catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      expect((error as UnauthorizedException).message).toBe('Invalid email or password');
+      expect(jwt.signAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('register', () => {
+    it('creates an unverified holder with a hashed password, a DID and a session', async () => {
+      const result = await service.register('  Jane@Example.COM ', 'correct-password', ' Jane ');
+
+      const created = users.create.mock.calls[0][0];
+      expect(created).toMatchObject({
+        email: 'jane@example.com',
+        displayName: 'Jane',
+        appwriteUserId: null,
+        googleId: null,
+        emailVerified: false,
+        accountStatus: AccountStatus.ACTIVE,
+        organizationId: null,
+      });
+      expect(created.passwordHash).not.toBe('correct-password');
+      await expect(bcrypt.compare('correct-password', created.passwordHash)).resolves.toBe(true);
+
+      expect(userRoles.create).toHaveBeenCalledWith({ userId: 'user-new', roleId: 'role-holder' });
+      expect(didService.createDid).toHaveBeenCalledWith('user-new');
+      expect(result.accessToken).toBe('signed.access.token');
+      expect(result.refreshToken).toMatch(/^session-1\./);
+      expect(result.user).toEqual({
+        id: 'user-new',
+        email: 'jane@example.com',
+        displayName: 'Jane',
+        emailVerified: false,
+        accountStatus: 'active',
+        googleLinked: false,
+        roles: ['holder'],
+        did: 'did:dioteko:abc',
+      });
+      expect(JSON.stringify(result)).not.toContain('passwordHash');
+    });
+
+    it('answers a neutral 409 when the email is already taken (e.g. a staff account)', async () => {
+      users.findOne.mockResolvedValue(makeUser());
+
+      const error = await service.register('jane@example.com', 'correct-password').catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).message).not.toMatch(/google|sign in using/i);
+      expect(users.save).not.toHaveBeenCalled();
+      expect(jwt.signAsync).not.toHaveBeenCalled();
+    });
+
+    it('answers the same neutral 409 when a concurrent registration wins the insert race', async () => {
+      users.save.mockRejectedValue(uniqueViolation());
+
+      const error = await service.register('jane@example.com', 'correct-password').catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).message).not.toContain('jane@example.com');
+      expect(userRoles.save).not.toHaveBeenCalled();
     });
   });
 });
