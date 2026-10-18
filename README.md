@@ -6,7 +6,7 @@
 
 **DioteKo** issues administrative certificates to citizens. A citizen signs in with Google, asks for a certificate in a mobile wallet, pays a Lightning invoice in sats, and receives a signed Verifiable Credential and a PDF with a QR code. Anyone can then verify the certificate publicly.
 
-> **Status:** development prototype for the Africa DID Hackathon 2026. Not production-ready. Simulated parts and known gaps are listed below and in [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
+> **Status:** Not production-ready. Simulated parts and known gaps are listed below and in [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 
 **Table of contents**
 
@@ -755,7 +755,7 @@ The DioteKo team (5 people):
 
 **DioteKo** délivre des certificats administratifs aux citoyens. Un citoyen se connecte avec Google, demande un certificat dans un wallet mobile, paie une facture Lightning en sats, et reçoit une Verifiable Credential signée ainsi qu'un PDF avec un QR code. Ensuite, n'importe qui peut vérifier le certificat publiquement.
 
-> **Statut :** prototype de développement pour l'Africa DID Hackathon 2026. Pas prêt pour la production. Les parties simulées et les écarts connus sont listés ci-dessous et dans [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
+> **Statut :** Pas prêt pour la production. Les parties simulées et les écarts connus sont listés ci-dessous et dans [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).
 
 **Table des matières**
 
