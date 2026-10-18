@@ -8,7 +8,7 @@ Do not use `docker-compose.prod.yml` as a production recipe yet (see section 1).
 
 | Item | Location | State |
 |---|---|---|
-| Backend image | `backend-nest/Dockerfile` | `node:20-alpine`, exposes 3001, has a `HEALTHCHECK`, runs `dist/main.js` |
+| Backend image | `backend-nest/Dockerfile` | `node:20-alpine`, exposes 3003, has a `HEALTHCHECK`, runs `dist/main.js` |
 | Dev stack | `docker-compose.dev.yml`, started by `npm run dev:up` | PostgreSQL, `backend-nest` and Appwrite (included from `docker-compose.appwrite.yml`) |
 | "Prod" compose | `docker-compose.prod.yml` | Still a copy of the dev stack: it loads `backend-nest/.env`, uses the image tag `:dev` and includes the dev Appwrite. See [docs/DECISIONS.md](docs/DECISIONS.md). Not usable as-is |
 | Console image | `frontweb/Dockerfile` | `node:22-alpine`, exposes 3000, runs `node .output/server/index.mjs` |
@@ -38,7 +38,7 @@ These switch on when `NODE_ENV=production` or `BITNOB_ENVIRONMENT=production`:
 - [ ] Appwrite: use a production instance. Disable the auth methods other than Google, and use an API key limited to `users.read`. See the "Production hardening checklist" in [docs/DEV_WORKFLOW.md](docs/DEV_WORKFLOW.md).
 - [ ] Generate new `JWT_SECRET` and `VC_SIGNING_SECRET` values outside the repo. Never reuse dev values.
 - [ ] Set `APP_BASE_URL` to the public HTTPS origin, and set `CORS_ORIGINS` to the exact console origin.
-- [ ] Put an HTTPS reverse proxy in front of port 3001. The proxy is not in the repo.
+- [ ] Put an HTTPS reverse proxy in front of port 3003. The proxy is not in the repo.
 - [ ] Mobile: build with the production `EXPO_PUBLIC_API_BASE_URL` and `EXPO_PUBLIC_APPWRITE_ENDPOINT`, both HTTPS.
 - [ ] Monitoring: `GET /api/healthz` for liveness and database check. Logs carry `[START]`, `[CALL]`, `[RESULT]` and `[STATE]` tags.
 - [ ] Review the open items in [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md).

@@ -73,7 +73,7 @@ landing page. No marketing copy, no emoji, no stock illustrations, no gradients,
 STACK
 React + Vite + TypeScript, Tailwind, shadcn/ui, React Router [remplacé par TanStack Router, voir frontweb/AGENTS.md], TanStack Query, React Hook Form + Zod,
 Recharts (dashboard only). No backend code. All server access goes through one typed client, src/lib/api.ts,
-using VITE_API_BASE_URL (default http://localhost:3001/api). VITE_USE_MOCKS=true serves realistic fixtures
+using VITE_API_BASE_URL (default http://localhost:3003/api). VITE_USE_MOCKS=true serves realistic fixtures
 from src/lib/mocks.ts with 400 ms latency, including a dev-only user switcher in the sidebar footer to
 impersonate each role, so every screen and every permission can be reviewed without a backend.
 

@@ -5,7 +5,7 @@ Two layers, both Jest, kept in separate configs so they never interfere.
 | Layer | Command (in `backend-nest/`) | Config | DB | What it covers |
 |---|---|---|---|---|
 | **Unit** | `npm test` | `jest.config.js` (`roots: src`) | none | Pure-function and stubbed-DI specs — Bitnob HMAC, envelopes, webhook guard, payout math (run `npm test` for the current count) |
-| **E2E** | `npm run test:e2e` | `test/jest-e2e.js` (`roots: test`) | `dioteko_test` | real `AppModule` over HTTP (supertest), real Postgres |
+| **E2E** | `npm run test:e2e` | `test/jest-e2e.js` (`roots: test`) | `dioteko_test_bitnob` | real `AppModule` over HTTP (supertest), real Postgres |
 
 `npm test` and `npm run test:e2e` are independent — the unit run never touches a database and never loads the `test/` folder.
 
@@ -18,11 +18,11 @@ Two layers, both Jest, kept in separate configs so they never interfere.
 
 | `NODE_ENV` | file | database |
 |---|---|---|
-| unset / `development` | `backend-nest/.env` | `dioteko_dev` |
-| `test` | `backend-nest/.env.test` | `dioteko_test` |
+| unset / `development` | `backend-nest/.env` | `dioteko_dev_bitnob` |
+| `test` | `backend-nest/.env.test` | `dioteko_test_bitnob` |
 | `production` | `backend-nest/.env.prod` | `dioteko_prod` (deploy only) |
 
-All three databases live on the **same** DioteKo Postgres instance (`dioteko-postgres`, host port 5435, same user/password) —
+All three databases live on the **same** DioteKo Postgres instance (`dioteko-postgres-bitnob`, host port 5442, same user/password) —
 only the database name differs. `.env` / `.env.test` / `.env.prod` are gitignored; copy the
 committed `.env.example` / `.env.test.example` / `.env.prod.example`.
 
@@ -30,11 +30,11 @@ committed `.env.example` / `.env.test.example` / `.env.prod.example`.
 
 ## How `npm run test:e2e` works
 
-1. `cross-env NODE_ENV=test` (works on Windows) → `.env.test` → `dioteko_test`.
-2. `pretest:e2e` runs `migration:run` + `seed` against `dioteko_test`.
+1. `cross-env NODE_ENV=test` (works on Windows) → `.env.test` → `dioteko_test_bitnob`.
+2. `pretest:e2e` runs `migration:run` + `seed` against `dioteko_test_bitnob`.
 3. `test/global-setup.ts` (once): asserts `NODE_ENV=test` **and** the resolved `DB_NAME` is
-   `dioteko_test` (refuses to run otherwise — this is what stops a missing `.env.test` from
-   pointing the suite at `dioteko_dev`), then re-applies migrations (idempotent, so
+   `dioteko_test_bitnob` (refuses to run otherwise — this is what stops a missing `.env.test` from
+   pointing the suite at `dioteko_dev_bitnob`), then re-applies migrations (idempotent, so
    `jest --watch` also works).
 4. `--runInBand` — all specs share the one test DB, so they run serially.
 5. Each spec: `beforeAll` boots the app, `beforeEach` calls `resetAndSeed`
@@ -164,13 +164,13 @@ Run `npm test` for the exact count (it changes with every change). The areas cov
 - `BITNOB_ENVIRONMENT` stays `sandbox` in `.env.test`. A money-move E2E must additionally assert
   it is not `production` before any POST — the production gate throws a `ForbiddenException` as
   the first line of every money-move method, so "prod" can't exercise transfers anyway.
-- Keep the test DB name literally `dioteko_test`; the guards assert it.
+- Keep the test DB name literally `dioteko_test_bitnob`; the guards assert it.
 
 ## Common pitfalls
 
-- **Forgetting `NODE_ENV=test`** → the app loads `.env` and hits `dioteko_dev`. `test:e2e` sets
+- **Forgetting `NODE_ENV=test`** → the app loads `.env` and hits `dioteko_dev_bitnob`. `test:e2e` sets
   it for you; `global-setup.ts` + `createTestApp()` refuse to run if the resolved DB isn't
-  `dioteko_test`.
+  `dioteko_test_bitnob`.
 - **Missing `backend-nest/.env.test`** → `dotenv` is a silent no-op. The DB-name guard catches
   this and tells you to copy the example.
 - **Sharing one DB between dev and test** → data pollution, flaky ordering. That's the whole

@@ -8,9 +8,9 @@ Short description of the system as it is built. The full detail (sequence diagra
 flowchart LR
   M["frontmobile<br/>Expo / React Native"]
   W["frontweb<br/>organisation console"]
-  N["backend-nest :3001<br/>NestJS 11 + TypeORM, prefix /api"]
-  PG[("PostgreSQL<br/>dioteko_dev / dioteko_test")]
-  AW["Appwrite 1.5.4 :8090<br/>dev, self-hosted"]
+  N["backend-nest :3003<br/>NestJS 11 + TypeORM, prefix /api"]
+  PG[("PostgreSQL<br/>dioteko_dev_bitnob / dioteko_test_bitnob")]
+  AW["Appwrite 1.5.4 :9000<br/>dev, self-hosted"]
   G(("Google OAuth"))
   BN(("Bitnob API<br/>sandbox, only pay-in"))
   BTC(("Bitcoin anchoring<br/>SIMULATED"))
@@ -46,7 +46,7 @@ flowchart LR
 
 ### Bootstrap (`src/main.ts`, `src/common/apply-global-app-config.ts`)
 
-- Port 3001 (`PORT`), global prefix `/api`, Swagger UI at `/api-docs` (outside the prefix).
+- Port 3003 (`PORT`), global prefix `/api`, Swagger UI at `/api-docs` (outside the prefix).
 - `ValidationPipe` with `whitelist`, `transform` and `forbidNonWhitelisted`; global `HttpExceptionFilter`.
 - `rawBody: true`, required to verify Bitnob webhook signatures.
 - CORS only for origins listed in `CORS_ORIGINS`. The mobile app is not subject to CORS.

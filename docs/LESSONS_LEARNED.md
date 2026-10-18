@@ -20,7 +20,7 @@ Format for new entries:
 
 **Problem:** `GET http://localhost:8090/` → `{"message":"Server Error","code":500,"file":".../Appwrite/Utopia/Request.php","line":152}`; trace shows `getHeader("x-appwrite-response-format", null)` from `app/controllers/general.php:399`.
 **Root cause:** `_APP_SYSTEM_RESPONSE_FORMAT` was not defined in `docker-compose.appwrite.yml`; the unset env resolves to `null`, which `Request::getHeader()` (string-typed default) rejects with a TypeError. The official Appwrite compose always defines it (empty).
-**Fix:** added `_APP_SYSTEM_RESPONSE_FORMAT: ""` to the `appwrite` service in `docker-compose.appwrite.yml`; recreated the container (`docker compose -p dioteko-dev -f docker-compose.dev.yml up -d --no-deps appwrite`).
+**Fix:** added `_APP_SYSTEM_RESPONSE_FORMAT: ""` to the `appwrite` service in `docker-compose.appwrite.yml`; recreated the container (`docker compose -p dioteko-dev-bitnob -f docker-compose.dev.yml up -d --no-deps appwrite`).
 **Verification:** `curl -i http://localhost:8090/` → 200; `curl http://localhost:8090/v1/health/version` → `{"version":"1.5.4"}`.
 **Rule to remember:** when hand-writing an Appwrite compose, every `_APP_*` var the official `.env` declares must exist (even empty) — an unset one can surface as a 500 TypeError rather than a config error.
 
@@ -90,10 +90,10 @@ Format for new entries:
 
 ## Google login: `ERR_NETWORK` to the backend although it was healthy
 
-**Problem:** After the Appwrite session + JWT succeeded, `POST /auth/appwrite/login` failed with axios `ERR_NETWORK` (`apiBaseUrl: http://localhost:3001/api`), toast "Serveur indisponible… Verifie que le backend est demarre".
-**Root cause:** `frontmobile/.env` had `EXPO_PUBLIC_API_BASE_URL=http://localhost:3001/api`, which overrides the LAN-IP auto-detection in `config/config.ts`; on a physical phone `localhost` is the phone itself. The backend was fine: container healthy, `GET /api/health` → 200, `POST /api/auth/appwrite/login` with a fake JWT → 401 on both `localhost` and the LAN IP. `DEV_WORKFLOW.md` listed `localhost` as the example value.
-**Fix:** removed the override from the local `.env` (auto-derives `http://<LAN-IP>:3001/api`); dev-only `console.warn` in `config.ts` when `API_BASE_URL` is localhost on native; dev error message now names the target URL; `.env.exemple` and `DEV_WORKFLOW.md` corrected.
-**Verification:** `curl` health/login via localhost and LAN IP (200/401); `tsc --noEmit` clean for touched files. Phone-side login to be confirmed (Windows firewall must allow inbound 3001).
+**Problem:** After the Appwrite session + JWT succeeded, `POST /auth/appwrite/login` failed with axios `ERR_NETWORK` (`apiBaseUrl: http://localhost:3003/api`), toast "Serveur indisponible… Verifie que le backend est demarre".
+**Root cause:** `frontmobile/.env` had `EXPO_PUBLIC_API_BASE_URL=http://localhost:3003/api`, which overrides the LAN-IP auto-detection in `config/config.ts`; on a physical phone `localhost` is the phone itself. The backend was fine: container healthy, `GET /api/health` → 200, `POST /api/auth/appwrite/login` with a fake JWT → 401 on both `localhost` and the LAN IP. `DEV_WORKFLOW.md` listed `localhost` as the example value.
+**Fix:** removed the override from the local `.env` (auto-derives `http://<LAN-IP>:3003/api`); dev-only `console.warn` in `config.ts` when `API_BASE_URL` is localhost on native; dev error message now names the target URL; `.env.exemple` and `DEV_WORKFLOW.md` corrected.
+**Verification:** `curl` health/login via localhost and LAN IP (200/401); `tsc --noEmit` clean for touched files. Phone-side login to be confirmed (Windows firewall must allow inbound 3003).
 **Rule to remember:** on a physical device never use `localhost` — Appwrite goes through an HTTPS tunnel, the API through the PC's LAN IP (or no override). Check the `apiBaseUrl` in the log before suspecting the backend.
 
 ## Bitnob Lightning settlement: documented simulation route returns 405
@@ -117,7 +117,7 @@ Format for new entries:
 **Problem:** Après l'ajout des routes de liste, l'application reçoit `Cannot GET /api/admin-certificates/requests` (404). Le source contient bien la route.
 **Root cause:** Le conteneur `backend-nest` n'a ni volume de code ni `watch` : il exécute l'image construite au dernier `npm run dev:up`. Cette image était antérieure aux routes.
 **Fix:** Reconstruction de l'image avec `npm run dev:up` (pas de correctif de code). Procédure ajoutée dans `docs/DEV_WORKFLOW.md`.
-**Verification:** `curl -si http://localhost:3001/api/admin-certificates/requests` répond `401` (route présente, protégée par JWT) et non plus `404`.
+**Verification:** `curl -si http://localhost:3003/api/admin-certificates/requests` répond `401` (route présente, protégée par JWT) et non plus `404`.
 **Rule to remember:** après tout changement de route ou de code de `backend-nest`, relancer `npm run dev:up`. Un `404` sur une route qui existe dans le source signifie image périmée, pas bug de routage ; vérifier d'abord avec `curl` (401 attendu).
 
 ## Mobile: écran de scan QR noir (`StyleSheet.absoluteFillObject` retiré)

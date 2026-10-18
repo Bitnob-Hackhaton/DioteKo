@@ -26,15 +26,15 @@ flowchart LR
     AW_SDK["appwriteAuth.ts<br/>SDK react-native-appwrite 0.34"]
   end
 
-  subgraph HOST["Machine de dev — Docker (projet dioteko-dev)"]
-    NEST["backend-nest :3001<br/>NestJS + TypeORM<br/>préfixe /api, Swagger /api-docs"]
-    PG[("dioteko-postgres<br/>dioteko_dev / dioteko_test")]
-    APPW["Appwrite 1.5.4 :8090"]
+  subgraph HOST["Machine de dev — Docker (projet dioteko-dev-bitnob)"]
+    NEST["backend-nest :3003<br/>NestJS + TypeORM<br/>préfixe /api, Swagger /api-docs"]
+    PG[("dioteko-postgres-bitnob<br/>dioteko_dev_bitnob / dioteko_test_bitnob")]
+    APPW["Appwrite 1.5.4 :9000"]
     MARIA[("MariaDB + Redis<br/>(Appwrite)")]
     PDFS[("Dossier storage/<br/>PDF des certificats")]
   end
 
-  NGROK["Tunnel HTTPS ngrok<br/>vers Appwrite :8090"]
+  NGROK["Tunnel HTTPS ngrok<br/>vers Appwrite :9000"]
   GOOGLE(("Google OAuth"))
   BITNOB(("Bitnob API v2<br/>sandbox"))
   BTC(("Bitcoin testnet"))
@@ -71,8 +71,8 @@ flowchart LR
 | **Mobile — login Google** | Connexion citoyen | ✅ | Google → Appwrite → JWT Appwrite → `/api/auth/appwrite/login` → tokens DioteKo |
 | **Mobile — écrans certificats / paiement / vérif** | Parcours métier | 🟡 | Branché sur Nest (`/admin-certificates/*`) : types, demande, liste, détail, facture Lightning (QR, polling, simulation en dev), complément et renvoi, PDF par lien signé, vérification. Reste : jamais vérifié sur téléphone ; les écrans `app/admin/*` sont des maquettes (`mockApiCall`) |
 | **backend-nest** | API métier | ✅ | Démarre healthy, 31 tables, 12 migrations, guards globaux JWT + rôles |
-| **PostgreSQL** | Données métier | ✅ | `dioteko-postgres` (instance propre au projet, port hôte 5435), bases `dioteko_dev` / `dioteko_test` |
-| **Appwrite 1.5.4** | Comptes + OAuth Google | ✅ | Conteneurs `dioteko-appwrite`, `-mariadb`, `-redis` ; exposé en HTTPS par ngrok |
+| **PostgreSQL** | Données métier | ✅ | `dioteko-postgres-bitnob` (instance propre au projet, port hôte 5442), bases `dioteko_dev_bitnob` / `dioteko_test_bitnob` |
+| **Appwrite 1.5.4** | Comptes + OAuth Google | ✅ | Conteneurs `dioteko-appwrite-bitnob`, `-mariadb`, `-redis` ; exposé en HTTPS par ngrok |
 | **DID / VC** | Identifiants et attestations | ✅ | DID `did:dioteko:<uuid>` ; VC = JWT HS256 signé avec `VC_SIGNING_SECRET` |
 | **Consentement / audit** | Consents + `access_logs` | ✅ partiel | Consentement CRUD minimal, journal d'accès réel ; VP minimal (sans divulgation sélective) |
 | **Bitnob** | Rail financier (encaissement et règlements) | ✅ sandbox | Encaissement Lightning des demandes (factures, webhook = signal, relecture chez Bitnob, réconciliateur) ; payouts, retraits, bulk, lecture. Clés `BITNOB_CLIENT_*` et `BITNOB_ENVIRONMENT=sandbox` à renseigner localement (§5, §6) |
@@ -86,12 +86,12 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-  subgraph NET_DEFAULT["Réseau dioteko-dev_default"]
-    BE["dioteko-backend-nest<br/>3001 vers 3001"]
-    AP["dioteko-appwrite<br/>8090 vers 80"]
-    MD["dioteko-appwrite-mariadb"]
-    RD["dioteko-appwrite-redis"]
-    PGC["dioteko-postgres<br/>5435 vers 5432<br/>dioteko_dev, dioteko_test"]
+  subgraph NET_DEFAULT["Réseau dioteko-dev-bitnob_default"]
+    BE["dioteko-backend-nest-bitnob<br/>3003 vers 3003"]
+    AP["dioteko-appwrite-bitnob<br/>9000 vers 80"]
+    MD["dioteko-appwrite-bitnob-mariadb"]
+    RD["dioteko-appwrite-bitnob-redis"]
+    PGC["dioteko-postgres-bitnob<br/>5442 vers 5432<br/>dioteko_dev_bitnob, dioteko_test_bitnob"]
   end
   BE --- PGC
   BE ---|"http://appwrite/v1"| AP
@@ -102,11 +102,11 @@ flowchart TB
 Points qui comptent :
 
 - **Une seule commande de démarrage** : `npm run dev:up` (le compose refuse un `docker compose up` direct via la garde `DEV_UP_GUARD`).
-- **Postgres propre au projet** : le conteneur `dioteko-postgres` est dans le réseau du projet, sans réseau ni conteneur partagé avec d'autres projets et sans service d'initialisation ; `dioteko_dev` est créée par `POSTGRES_DB`, `dioteko_test` par `dev:up` / `db:setup`. Port hôte : `DIOTEKO_PG_HOST_PORT` (5435 par défaut).
+- **Postgres propre au projet** : le conteneur `dioteko-postgres-bitnob` est dans le réseau du projet, sans réseau ni conteneur partagé avec d'autres projets et sans service d'initialisation ; `dioteko_dev_bitnob` est créée par `POSTGRES_DB`, `dioteko_test_bitnob` par `dev:up` / `db:setup`. Port hôte : `DIOTEKO_PG_HOST_PORT` (5442 par défaut).
 - **Deux URLs Appwrite différentes** : le **backend** parle à `http://appwrite/v1` (réseau Docker) ; le **mobile** parle à l'URL **HTTPS ngrok** (Google refuse les IP et un `localhost` de téléphone est le téléphone — voir `DEV_WORKFLOW.md`).
-- **URL de l'API côté mobile** : dérivée automatiquement de l'hôte Metro (`exp://<IP>:8083` → `http://<IP>:3001/api`, voir `frontmobile/config/config.ts`).
+- **URL de l'API côté mobile** : dérivée automatiquement de l'hôte Metro (`exp://<IP>:8083` → `http://<IP>:3003/api`, voir `frontmobile/config/config.ts`).
 - **PDF des certificats** : écrits sur le **système de fichiers du conteneur** (`storage/admin-certificates/`, ou `ADMIN_CERTIFICATES_STORAGE_DIR`). Le service `backend-nest` n'a **aucun volume** monté (compose dev **et** prod : seul le service `postgres` en a un) → un `docker compose up --force-recreate` **perd les PDF** (les lignes en base restent, `GET :id/file` renverrait alors 404). À corriger avant toute démo persistante.
-- **Environnements** : `NODE_ENV` choisit `.env` / `.env.test` / `.env.prod` → bases `dioteko_dev` / `dioteko_test` / `dioteko_prod` (placeholder, jamais créée en local).
+- **Environnements** : `NODE_ENV` choisit `.env` / `.env.test` / `.env.prod` → bases `dioteko_dev_bitnob` / `dioteko_test_bitnob` / `dioteko_prod` (placeholder, jamais créée en local).
 
 ---
 
@@ -545,7 +545,7 @@ Il n'existe **ni colonne prénom/nom séparée**, ni lien entre le nom du certif
 - **Validation** : `ValidationPipe` + `HttpExceptionFilter` globaux (`apply-global-app-config.ts`, partagés avec le harnais E2E) ; pas de stack trace dans les réponses.
 - **Corps brut** : `rawBody: true` au démarrage, indispensable à la signature des webhooks Bitnob.
 - **Configuration** : `ConfigModule` typé (`config/configuration.ts`) validé au boot (`env.validation.ts`) ; `JWT_SECRET` et `VC_SIGNING_SECRET` obligatoires.
-- **Tests** : unitaires Jest par service + E2E (`test/appwrite-login.e2e-spec.ts`) sur la base `dioteko_test` ; **aucun test automatique côté mobile**.
+- **Tests** : unitaires Jest par service + E2E (`test/appwrite-login.e2e-spec.ts`) sur la base `dioteko_test_bitnob` ; **aucun test automatique côté mobile**.
 - **Comptes de démonstration** (seed) : `issuer-demo@`, `admin-demo@`, `holder-demo@dioteko.local`, organisation « Mairie Centrale Dakar » (type `municipality`).
 
 ## 11. Comment garder ce document juste

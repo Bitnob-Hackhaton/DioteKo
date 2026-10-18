@@ -14,7 +14,7 @@ Three parts make up the system:
 
 | Part | Folder | Role |
 |---|---|---|
-| Backend | `backend-nest/` | NestJS + TypeORM + PostgreSQL, API under `/api` on port **3001** |
+| Backend | `backend-nest/` | NestJS + TypeORM + PostgreSQL, API under `/api` on port **3003** |
 | Citizen app | `frontmobile/` | Expo / React Native. Calls only `backend-nest` |
 | Staff console | `frontweb/` | TanStack Start web app for organization staff (port 3000 in dev) |
 

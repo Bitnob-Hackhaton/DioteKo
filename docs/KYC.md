@@ -256,7 +256,7 @@ Le champ `details` n'apparaît que hors production.
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `IDSWYFT_BASE_URL` | `http://localhost:8000` | Origine de l'API Idswyft. Dans la stack de dev, le conteneur `dioteko-backend-nest` reçoit `http://idswyft-api:3001` de `docker-compose.dev.yml` (nom du service sur le réseau compose) ; la valeur par défaut ne sert que pour un backend lancé sur la machine. |
+| `IDSWYFT_BASE_URL` | `http://localhost:8010` | Origine de l'API Idswyft. Dans la stack de dev, le conteneur `dioteko-backend-nest-bitnob` reçoit `http://idswyft-api:3001` de `docker-compose.dev.yml` (nom du service sur le réseau compose) ; la valeur par défaut ne sert que pour un backend lancé sur la machine. |
 | `IDSWYFT_API_KEY` | vide | Clé `X-API-Key` créée par `npm run kyc:bootstrap` (ou dans le dashboard Idswyft). Vide : chaque appel répond 503. Avertissement au démarrage seulement. |
 | `IDSWYFT_WEBHOOK_SECRET` | vide | Secret HMAC du webhook. Seuls `development` et `test` acceptent un webhook sans secret (stocké, jamais exécuté). Dans tout autre `NODE_ENV`, il répond 401. Avertissement au démarrage seulement. |
 | `KYC_ENFORCEMENT` | `on` | `off` lève la porte partout, **hors production seulement** (ignoré si `NODE_ENV=production`, avec un avertissement). Toute autre valeur que `on` ou `off` est refusée au démarrage. |
@@ -275,7 +275,7 @@ Modèles : `backend-nest/.env.example` (valeurs de dev), `.env.test.example`, `.
 - **Le corps de réponse Idswyft n'est jamais recopié.** Seul son code d'erreur court (`providerCode`) est gardé pour les logs.
 - **Téléphone :** chaque photo prise est supprimée du cache de l'application dès qu'elle est envoyée, reprise (« Reprendre ») ou que l'écran est quitté (`frontmobile/services/photo-cleanup.ts`, `expo-file-system`). Best effort : un échec de suppression ne bloque pas le parcours.
 - **Côté Idswyft, les images sont conservées** dans le volume `idswyft_uploads` du stack de dev (stockage local). La purge automatique (`DATA_RETENTION_DAYS`, 90 par défaut) ne tourne qu'avec `NODE_ENV=production` : en dev, rien n'est effacé tout seul. À régler avant toute donnée réelle (autorisation CDP, durée de conservation, chiffrement `STORAGE_ENCRYPTION`).
-- **Logs d'Idswyft (conteneur `dioteko-idswyft-api`) :** ils contiennent les champs lus sur la pièce (nom, numéro, dates), au niveau info. Ne pas les exporter tels quels ; à filtrer ou faire tourner avant toute donnée réelle.
+- **Logs d'Idswyft (conteneur `dioteko-idswyft-api-bitnob`) :** ils contiennent les champs lus sur la pièce (nom, numéro, dates), au niveau info. Ne pas les exporter tels quels ; à filtrer ou faire tourner avant toute donnée réelle.
 - **Logs :** identifiants et statuts seulement (`[START]`, `[ENTITY]`, `[CALL]`, `[RESULT]`, `[STATE]`), jamais de corps ni de nom de fichier.
 
 ---
@@ -311,7 +311,7 @@ Source : dépôt open source `team-idswyft/idswyft-community`, tag `v1.12.19` (h
 
 ## 12. Résultats mesurés (spike B0)
 
-**Partiellement fait : CNI sénégalaise évaluée (recto, verso, selfie) ; passeport non évalué.** Le spike se fait avec des photos **fournies par l'utilisateur** (CNI recto et verso, passeport, selfie). L'agent ne manipule pas de vraie pièce. Le test se fait contre `http://localhost:8000` avec une clé créée dans le dashboard (`http://localhost:8086`).
+**Partiellement fait : CNI sénégalaise évaluée (recto, verso, selfie) ; passeport non évalué.** Le spike se fait avec des photos **fournies par l'utilisateur** (CNI recto et verso, passeport, selfie). L'agent ne manipule pas de vraie pièce. Le test se fait contre `http://localhost:8010` avec une clé créée dans le dashboard (`http://localhost:8087`).
 
 Checklist à remplir :
 

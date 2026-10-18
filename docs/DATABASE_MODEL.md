@@ -1,7 +1,7 @@
 # Modèle de données — DioteKo (backend-nest)
 
 > **Statut :** relevé des **32 entités TypeORM** (`backend-nest/src/**/*.entity.ts`), recoupé avec les **13 migrations** de `src/database/migrations/` (§8).
-> **Base :** PostgreSQL `dioteko_dev` (ou `dioteko_test` / `dioteko_prod` selon `NODE_ENV`). `synchronize: false` → **seules les migrations** modifient le schéma.
+> **Base :** PostgreSQL `dioteko_dev_bitnob` (ou `dioteko_test_bitnob` / `dioteko_prod` selon `NODE_ENV`). `synchronize: false` → **seules les migrations** modifient le schéma.
 > **Documents liés :** [`ARCHITECTURE_AS_BUILT.md`](./ARCHITECTURE_AS_BUILT.md) (flux et intégrations) · [`SCHEMA.md`](./SCHEMA.md) (dictionnaire de schéma).
 > Les **comptes d'authentification** (mots de passe Google/OAuth) vivent dans **Appwrite** (MariaDB), pas dans cette base : voir §4.
 

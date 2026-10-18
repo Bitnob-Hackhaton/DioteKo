@@ -79,7 +79,7 @@ now a clean `ConflictException`.
 ## `backend-nest` in the root compose
 
 **Decision:** `backend-nest` is a visible app service in the ROOT `docker-compose.dev.yml` —
-`npm run dev:up` builds and starts it (image `dioteko-backend-nest:dev`, port 3001) next to the
+`npm run dev:up` builds and starts it (image `dioteko-backend-nest-bitnob:dev`, port 3003) next to the
 database. All dev tooling targets `backend-nest`: `db:setup`/`db:reset` run `migration:run` +
 `seed` for `backend-nest`.
 **Why:** The NestJS app must stay containerized (user requirement) and the root compose is the
@@ -188,13 +188,13 @@ One certificate can have multiple payout rows (failed attempts, retries), but on
 
 ## Infra: three-database model (dev/test/prod), E2E harness, self-hosted Appwrite, env-file-driven compose
 
-**Decision:** (1) Three databases on one Postgres: `dioteko_dev`, `dioteko_test`, `dioteko_prod`, selected by `NODE_ENV`. One resolver `backend-nest/src/config/env-files.ts` `envFilePathForNodeEnv()` used by the Nest app, TypeORM CLI, and seed. (2) E2E test harness (Jest, separate `jest-e2e.json`, `npm run test:e2e`): each spec calls `resetAndSeed` in `beforeEach` = `TRUNCATE ... RESTART IDENTITY CASCADE` over all mapped tables + re-`seedBaseline`. `test/global-setup.ts` and `test/utils/create-test-app.ts` refuse to run unless the resolved `DB_NAME === dioteko_test`. (`npm run db:reset` is the separate destructive `dropdb`+recreate path for dev/test.) Seed logic lives in `src/database/seeds/seed-baseline.ts`, shared by CLI and E2E. (3) Self-hosted Appwrite in `docker-compose.appwrite.yml` (included by dev compose, port 8090). (4) `.env.dev` / `.env.test` / `.env.prod` templates committed; dev compose interpolates via `docker compose --env-file`. (5) Prod compose has minimal fixes (no `.env` mount, healthcheck → `/api/healthz`); no full rework. (6) Security/migration blocking fixes: `.dockerignore` excludes all `.env*`; `seed.ts` throws on `NODE_ENV=production`; `env.validation.ts` rejects signing secrets outside `NODE_ENV=test`; `data-source.ts` throws instead of fallback when DB vars unset.
+**Decision:** (1) Three databases on one Postgres: `dioteko_dev_bitnob`, `dioteko_test_bitnob`, `dioteko_prod`, selected by `NODE_ENV`. One resolver `backend-nest/src/config/env-files.ts` `envFilePathForNodeEnv()` used by the Nest app, TypeORM CLI, and seed. (2) E2E test harness (Jest, separate `jest-e2e.json`, `npm run test:e2e`): each spec calls `resetAndSeed` in `beforeEach` = `TRUNCATE ... RESTART IDENTITY CASCADE` over all mapped tables + re-`seedBaseline`. `test/global-setup.ts` and `test/utils/create-test-app.ts` refuse to run unless the resolved `DB_NAME === dioteko_test_bitnob`. (`npm run db:reset` is the separate destructive `dropdb`+recreate path for dev/test.) Seed logic lives in `src/database/seeds/seed-baseline.ts`, shared by CLI and E2E. (3) Self-hosted Appwrite in `docker-compose.appwrite.yml` (included by dev compose, port 8090). (4) `.env.dev` / `.env.test` / `.env.prod` templates committed; dev compose interpolates via `docker compose --env-file`. (5) Prod compose has minimal fixes (no `.env` mount, healthcheck → `/api/healthz`); no full rework. (6) Security/migration blocking fixes: `.dockerignore` excludes all `.env*`; `seed.ts` throws on `NODE_ENV=production`; `env.validation.ts` rejects signing secrets outside `NODE_ENV=test`; `data-source.ts` throws instead of fallback when DB vars unset.
 
 **Why:** Without test isolation, unit specs are DB-less and there is no E2E path at all, and a shared dev/test DB causes data pollution and order-dependent tests. A three-database model on one instance keeps low-friction infra (one Postgres, one set of network/credentials) while enabling test isolation (name-based separation). Appwrite is live-accessed by `AppwriteService.verifyClientJwt` (real `account.get()` round-trip) and needs a local instance for E2E login tests. `.env` interpolation into compose avoids `docker-compose.override.yml` churn and keeps defaults working on fresh clones. The prod templates-only approach keeps prod configuration separate (never auto-created/seeded locally) without requiring manual env setup. Security fixes (production gate in seed, env-file scrubbing from images, DB var validation) prevent secrets leaks and accidental production writes during dev/test.
 
-**Alternatives considered:** Separate Postgres instance per env (rejected — multi-instance friction). A single dev database plus only `dioteko_test` (rejected — user wanted a clean dev/test/prod triplet). Mock database in E2E tests (rejected — E2E needs real Postgres for migration + seed fidelity). Point at remote/shared Appwrite for dev (rejected — user wanted self-contained). Manual `.env.dev` setup per clone (rejected — less friction with templates + defaults).
+**Alternatives considered:** Separate Postgres instance per env (rejected — multi-instance friction). A single dev database plus only `dioteko_test_bitnob` (rejected — user wanted a clean dev/test/prod triplet). Mock database in E2E tests (rejected — E2E needs real Postgres for migration + seed fidelity). Point at remote/shared Appwrite for dev (rejected — user wanted self-contained). Manual `.env.dev` setup per clone (rejected — less friction with templates + defaults).
 
-**Verification:** `npm run dev:up` starts the DB + Appwrite + backend-nest. `npm run db:setup` creates + migrates both `dioteko_dev` and `dioteko_test`. `npm run db:reset` truncates and re-seeds `dioteko_test`. `npm run test:e2e` migrates `dioteko_test`, asserts DB name before boot, runs real AppModule over supertest. `npm run seed:appwrite` idempotent, prod-guarded. `.dockerignore` verified to exclude `.env*`. `seed.ts` confirmed throws on `process.env.NODE_ENV === 'production'`.
+**Verification:** `npm run dev:up` starts the DB + Appwrite + backend-nest. `npm run db:setup` creates + migrates both `dioteko_dev_bitnob` and `dioteko_test_bitnob`. `npm run db:reset` truncates and re-seeds `dioteko_test_bitnob`. `npm run test:e2e` migrates `dioteko_test_bitnob`, asserts DB name before boot, runs real AppModule over supertest. `npm run seed:appwrite` idempotent, prod-guarded. `.dockerignore` verified to exclude `.env*`. `seed.ts` confirmed throws on `process.env.NODE_ENV === 'production'`.
 
 **Files touched:** `backend-nest/src/config/env-files.ts`, `env.validation.ts`, `data-source.ts`; `scripts/docker-dev-up.js`; `docker-compose.dev.yml`, `docker-compose.appwrite.yml`; `.env.dev.example`, `.env.test.example`, `.env.prod.example`, `backend-nest/.env.test.example`, `backend-nest/.env.prod.example`; `.dockerignore`; `test/global-setup.ts`, `test/create-test-app.ts`, `jest-e2e.json`; `src/database/seeds/seed-baseline.ts`, `seed.ts`.
 
@@ -274,8 +274,8 @@ the real anchoring uses a self-built `OP_RETURN` transaction or an existing grou
 
 **Decision:** The root dev stack (`docker-compose.dev.yml`) owns its database: a `postgres` service
 (container `dioteko-postgres`, `postgres:18-alpine`, named volume `postgres_data`) on the project's own default
-network, published on host port **5435** (`DIOTEKO_PG_HOST_PORT` in `.env.dev`). `dioteko_dev` is created by
-`POSTGRES_DB`; `dioteko_test` is created idempotently by `scripts/docker-dev-up.js` (`npm run dev:up` / `db:setup` /
+network, published on host port **5435** (`DIOTEKO_PG_HOST_PORT` in `.env.dev`). `dioteko_dev_bitnob` is created by
+`POSTGRES_DB`; `dioteko_test_bitnob` is created idempotently by `scripts/docker-dev-up.js` (`npm run dev:up` / `db:setup` /
 `db:reset`) with `psql` inside the container.
 **Why:** The repo is shared. A self-contained stack works on any machine with Docker and cannot disturb (or be
 disturbed by) other projects. Port 5435 avoids 5432/5433/5434, which other projects commonly publish.
@@ -325,7 +325,7 @@ identity check (KYC through Idswyft); see the KYC entries below.
 
 ## Idswyft self-hosted chosen as the KYC provider; Ballerine not retained
 
-**Decision:** Identity verification runs on a self-hosted Idswyft (API on port 8000, dashboard on 8086, in its own Docker stack
+**Decision:** Identity verification runs on a self-hosted Idswyft (API on port 8000, dashboard on 8087, in its own Docker stack
 outside this repo). `backend-nest/src/modules/kyc/` calls it with an `X-API-Key`.
 **Why:** Document and selfie processing stays on our own infrastructure, with no third-party cloud. Idswyft documents a v2
 verification flow (initialize, front, back, live capture, status) and signed webhooks.

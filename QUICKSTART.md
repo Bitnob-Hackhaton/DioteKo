@@ -14,7 +14,7 @@ Run the current stack locally: PostgreSQL, the `backend-nest` API, the mobile wa
 npm run dev:up
 ```
 
-This starts DioteKo's PostgreSQL (`dioteko-postgres`, host port 5435), the `backend-nest` container (port 3001) and a local Appwrite (port 8090). The first run builds the images and can take a while.
+This starts DioteKo's PostgreSQL (`dioteko-postgres-bitnob`, host port 5442), the `backend-nest` container (port 3003) and a local Appwrite (port 9000). The first run builds the images and can take a while.
 
 ## 2. Configure the backend
 
@@ -32,15 +32,15 @@ Fill in `JWT_SECRET` and `VC_SIGNING_SECRET`. The app refuses to start while eit
 npm run db:setup
 ```
 
-This runs migrations and the seed for `dioteko_dev` and `dioteko_test`.
+This runs migrations and the seed for `dioteko_dev_bitnob` and `dioteko_test_bitnob`.
 
 ## 4. Check the API
 
 ```bash
-curl http://localhost:3001/api/healthz
+curl http://localhost:3003/api/healthz
 ```
 
-Expected: `{"status":"ok","db":"up",...}`. Swagger UI: http://localhost:3001/api-docs
+Expected: `{"status":"ok","db":"up",...}`. Swagger UI: http://localhost:3003/api-docs
 
 ## 5. Start the mobile wallet
 

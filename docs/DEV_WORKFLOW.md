@@ -2,10 +2,10 @@
 
 Day-to-day commands for this repo. New developer? Do **Quick start** top to bottom.
 
-- `backend-nest/` — the NestJS + TypeORM + PostgreSQL backend (port 3001). The only backend the apps call.
+- `backend-nest/` — the NestJS + TypeORM + PostgreSQL backend (port 3003). The only backend the apps call.
 - `frontmobile/` — Expo / React Native citizen app. Calls `backend-nest` only.
 - `frontweb/` — staff web console (TanStack Start). Dev server on port 3000.
-- Appwrite — self-hosted identity provider for the mobile Google-OAuth login (port 8090, dev only).
+- Appwrite — self-hosted identity provider for the mobile Google-OAuth login (port 9000, dev only).
 
 ---
 
@@ -21,16 +21,16 @@ npm install
 cp .env.example .env                 # fill JWT_SECRET / VC_SIGNING_SECRET — app won't boot without them
 cd ..
 
-# 3. create + migrate + seed the databases (dioteko_dev AND dioteko_test)
+# 3. create + migrate + seed the databases (dioteko_dev_bitnob AND dioteko_test_bitnob)
 npm run db:setup
 
 # 4. check it's alive
-curl http://localhost:3001/api/healthz          # {"status":"ok","db":"up",...}
+curl http://localhost:3003/api/healthz          # {"status":"ok","db":"up",...}
 ```
 
-Swagger: <http://localhost:3001/api-docs>. Appwrite console: <http://localhost:8090>.
+Swagger: <http://localhost:3003/api-docs>. Appwrite console: <http://localhost:9000>.
 
-**Host mode** (hot reload — don't run at the same time as the container, they share port 3001):
+**Host mode** (hot reload — don't run at the same time as the container, they share port 3003):
 
 ```bash
 cd backend-nest
@@ -42,21 +42,21 @@ npm run start:dev
 
 ## Environments — `.env` / `.env.test` / `.env.prod`
 
-One DioteKo Postgres instance (container `dioteko-postgres`, host port **5435**, same user / password), **three databases**. `NODE_ENV`
+One DioteKo Postgres instance (container `dioteko-postgres-bitnob`, host port **5442**, same user / password), **three databases**. `NODE_ENV`
 picks the env file — one resolver, `backend-nest/src/config/env-files.ts`, used by the app, the
 TypeORM CLI and the seed:
 
 | `NODE_ENV` | env file | database | used for |
 |---|---|---|---|
-| unset / `development` | `backend-nest/.env` | `dioteko_dev` | day-to-day dev |
-| `test` | `backend-nest/.env.test` | `dioteko_test` | `npm run test:e2e` |
+| unset / `development` | `backend-nest/.env` | `dioteko_dev_bitnob` | day-to-day dev |
+| `test` | `backend-nest/.env.test` | `dioteko_test_bitnob` | `npm run test:e2e` |
 | `production` | `backend-nest/.env.prod` | `dioteko_prod` | deploy only (not created locally) |
 
 Templates are committed (`.env.example`, `.env.test.example`, `.env.prod.example`); the real
 `.env*` files are gitignored. `.env.test.example` ships working test-only secrets, so
 `npm run test:e2e` works right after `cp .env.test.example .env.test`.
 
-> **Own Postgres.** DioteKo runs its own `dioteko-postgres` on its own network and port, with no init service
+> **Own Postgres.** DioteKo runs its own `dioteko-postgres-bitnob` on its own network and port, with no init service
 > (see "Infra reference" below).
 
 ---
@@ -68,7 +68,7 @@ Templates are committed (`.env.example`, `.env.test.example`, `.env.prod.example
 | `npm run start:dev` | `nest start --watch` (host mode) |
 | `npm run build` / `npm run typecheck` | compile / `tsc --noEmit` |
 | `npm test` | Jest unit suite, no database (run it for the current count) |
-| `npm run test:e2e` | Jest E2E vs `dioteko_test` (see `docs/TESTING.md`) |
+| `npm run test:e2e` | Jest E2E vs `dioteko_test_bitnob` (see `docs/TESTING.md`) |
 | `npm run migration:run` / `:revert` | apply / roll back migrations (dev DB; `cross-env NODE_ENV=test` for the test DB) |
 | `npm run migration:generate -- src/database/migrations/<Name>` | new migration from entity changes |
 | `npm run seed` | idempotent baseline: 4 roles, 1 demo org + issuer DID, 3 demo users |
@@ -84,7 +84,7 @@ Templates are committed (`.env.example`, `.env.test.example`, `.env.prod.example
 | `holder-demo@dioteko.local` | holder |
 
 ```bash
-curl -X POST http://localhost:3001/api/auth/login \
+curl -X POST http://localhost:3003/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"issuer-demo@dioteko.local","password":"demo-password-change-me"}'
 ```
@@ -99,12 +99,12 @@ curl -X POST http://localhost:3001/api/auth/login \
 
 | Command | Effect |
 |---|---|
-| `dev:up` | start DioteKo's Postgres, wait until it is healthy, create `dioteko_dev`/`dioteko_test` if missing, build & start `backend-nest` + Appwrite |
+| `dev:up` | start DioteKo's Postgres, wait until it is healthy, create `dioteko_dev_bitnob`/`dioteko_test_bitnob` if missing, build & start `backend-nest` + Appwrite |
 | `dev:down` | stop DioteKo's containers (data is kept in the `postgres_data` volume) |
 | `dev:down:clean` | same + delete the **Postgres and Appwrite** volumes (destructive) |
 | `dev:logs` / `dev:ps` | `docker compose logs -f` / list containers |
-| `db:setup` | `migration:run` + `seed` for **both** `dioteko_dev` and `dioteko_test`, then best-effort `seed:appwrite` |
-| `db:reset` | **DESTRUCTIVE**: drop + recreate `dioteko_dev` and `dioteko_test`, re-migrate + re-seed. Prompts unless `-- --yes`. Nothing outside DioteKo's own Postgres is touched. |
+| `db:setup` | `migration:run` + `seed` for **both** `dioteko_dev_bitnob` and `dioteko_test_bitnob`, then best-effort `seed:appwrite` |
+| `db:reset` | **DESTRUCTIVE**: drop + recreate `dioteko_dev_bitnob` and `dioteko_test_bitnob`, re-migrate + re-seed. Prompts unless `-- --yes`. Nothing outside DioteKo's own Postgres is touched. |
 
 Bare `docker compose up` at the root fails by design (`DEV_UP_GUARD`) — use `npm run dev:up`.
 It passes `--env-file .env.dev` to compose (copy `.env.dev.example`; every value also has a
@@ -118,9 +118,9 @@ Un `docker compose restart` ne suffit pas.
 - Après tout changement de route ou de code dans `backend-nest/src/`, lancer `npm run dev:up` (reconstruit l'image).
 - Symptôme d'image périmée : le mobile reçoit `Cannot GET /api/admin-certificates/requests` (404) alors que la route
   existe dans le source.
-- Vérification : `curl -si http://localhost:3001/api/admin-certificates/requests` doit répondre **401** (route présente,
+- Vérification : `curl -si http://localhost:3003/api/admin-certificates/requests` doit répondre **401** (route présente,
   protégée par JWT). Un **404** signifie que l'image ne contient pas la route.
-- Mode hôte (`npm run start:dev`) : pas concerné, il recompile à chaud. Ne pas lancer les deux en même temps (port 3001).
+- Mode hôte (`npm run start:dev`) : pas concerné, il recompile à chaud. Ne pas lancer les deux en même temps (port 3003).
 
 ---
 
@@ -141,7 +141,7 @@ Certificate requests are paid with a Lightning invoice created at Bitnob, the on
    not whitelisted" otherwise, sandbox included). Use the narrowest range that works (`/32`), not a `/8`.
 3. Without a webhook nothing else is needed: the status route (`GET /api/admin-certificates/requests/:id/lightning-invoices/status`)
    and `issue` read the invoice from Bitnob themselves. The background reconciler (`BitnobInvoiceReconcilerService`) polls pending invoices every interval and settles them if the status changed.
-4. For webhooks, expose port 3001 over HTTPS (a tunnel such as ngrok) and register `https://<tunnel>/api/bitnob/webhooks` in the
+4. For webhooks, expose port 3003 over HTTPS (a tunnel such as ngrok) and register `https://<tunnel>/api/bitnob/webhooks` in the
    Bitnob dashboard, then set `BITNOB_WEBHOOK_SECRET` (it falls back to the client secret when empty). Bitnob delivers from
    18.171.51.218 and 13.134.154.133 (subject to change). A webhook is only a signal: the invoice is still read from Bitnob before being marked paid.
 5. A sandbox invoice cannot be paid through the API (sending Lightning is disabled). Paying one needs a real Lightning
@@ -156,13 +156,13 @@ Identity verification (`docs/KYC.md`) calls a self-hosted Idswyft. It is defined
 dashboard; nothing outside the repo). Images are built from the open-source repository, pinned to the tag `IDSWYFT_VERSION`
 (first build: a few minutes). A one-shot service `idswyft-migrations` copies the release's SQL migrations into a volume, because the API image does not contain them. Disable it by commenting the
 `docker-compose.idswyft.yml` line in `docker-compose.dev.yml`; stop only Idswyft with
-`docker compose -p dioteko-dev stop idswyft-api idswyft-dashboard idswyft-ml-engine idswyft-postgres`.
+`docker compose -p dioteko-dev-bitnob stop idswyft-api idswyft-dashboard idswyft-ml-engine idswyft-postgres`.
 
-1. `npm run dev:up` from the repo root. Ports 8000 (API) and 8086 (dashboard) must be free: stop any other Idswyft stack first
+1. `npm run dev:up` from the repo root. Ports 8000 (API) and 8087 (dashboard) must be free: stop any other Idswyft stack first
    (e.g. an older copy started from outside the repo). Change the ports with `IDSWYFT_API_HOST_PORT` / `IDSWYFT_DASHBOARD_HOST_PORT` in `.env.dev`.
-2. Dashboard: `http://localhost:8086`. Log in with the one-time code printed in the API container logs
-   (`docker logs dioteko-idswyft-api`). Do not paste that code or any credential into a file.
-3. API: `http://localhost:8000`. Interactive docs: `http://localhost:8000/api/docs`. Health: `/api/health`.
+2. Dashboard: `http://localhost:8087`. Log in with the one-time code printed in the API container logs
+   (`docker logs dioteko-idswyft-api-bitnob`). Do not paste that code or any credential into a file.
+3. API: `http://localhost:8010`. Interactive docs: `http://localhost:8010/api/docs`. Health: `/api/health`.
 4. Create the API key with `npm run kyc:bootstrap` (repo root). It signs in (or registers) the dev developer `kyc-dev@dioteko.dev` through the OTP flow — this dev instance has no e-mail provider, so the API
    returns the one-time code itself — and mints a key; the key is written to `backend-nest/.env` as `IDSWYFT_API_KEY` and never printed.
    `--email <e-mail>` uses another developer; or create the key in the dashboard. `--force` replaces a non-empty `IDSWYFT_API_KEY`. Then `npm run dev:up` so the
@@ -171,7 +171,7 @@ dashboard; nothing outside the repo). Images are built from the open-source repo
 
    | Variable | Dev value |
    |---|---|
-   | `IDSWYFT_BASE_URL` | `http://localhost:8000` in host mode (`npm run start:dev`). The backend container ignores it: `docker-compose.dev.yml` sets `http://idswyft-api:3001` (service name over the compose network) |
+   | `IDSWYFT_BASE_URL` | `http://localhost:8010` in host mode (`npm run start:dev`). The backend container ignores it: `docker-compose.dev.yml` sets `http://idswyft-api:3001` (service name over the compose network) |
    | `IDSWYFT_API_KEY` | written by `npm run kyc:bootstrap` |
    | `IDSWYFT_WEBHOOK_SECRET` | optional in dev (a webhook without it is stored, never acted on) |
    | `IDSWYFT_ENGINE_URL` | ML engine for the pre-upload photo check; the backend container gets `http://idswyft-ml-engine:3002` from `docker-compose.dev.yml`; empty = no check |
@@ -194,7 +194,7 @@ dashboard; nothing outside the repo). Images are built from the open-source repo
 
 **Webhook limitation (local):** Idswyft refuses to register a webhook URL that points to `localhost` or a private address
 (SSRF check). Locally, no webhook arrives: the dossier advances only when the status is re-read (`GET /api/kyc/status`,
-which the KYC screen polls about every 4 s while the dossier is open). To test the webhook itself, expose port 3001 over HTTPS
+which the KYC screen polls about every 4 s while the dossier is open). To test the webhook itself, expose port 3003 over HTTPS
 (a tunnel, as for Bitnob) and register `https://<tunnel>/api/kyc/webhook/idswyft` in Idswyft by hand. No DioteKo code calls the
 registration endpoint.
 
@@ -208,7 +208,7 @@ registration endpoint.
 volumes, always running). Stop just Appwrite:
 
 ```bash
-docker compose -p dioteko-dev stop appwrite appwrite-mariadb appwrite-redis
+docker compose -p dioteko-dev-bitnob stop appwrite appwrite-mariadb appwrite-redis
 ```
 
 Disable it entirely: comment the `include: - docker-compose.appwrite.yml` line in
@@ -218,7 +218,7 @@ Disable it entirely: comment the `include: - docker-compose.appwrite.yml` line i
 
 Appwrite has no headless project setup. After the first `npm run dev:up`:
 
-1. Open <http://localhost:8090> → create the root/admin account.
+1. Open <http://localhost:9000> → create the root/admin account.
 2. Create a project named `dioteko`. Copy its **Project ID** → `APPWRITE_PROJECT_ID` in
    `backend-nest/.env` (and `.env.test` if you want the Appwrite E2E).
 3. **Overview → Integrations → API Keys** → create a key with scopes `users.read` + `users.write`.
@@ -232,7 +232,7 @@ Appwrite has no headless project setup. After the first `npm run dev:up`:
    (so it passes the login flow's verification check).
 
 The backend-nest container talks to Appwrite in-network (`APPWRITE_ENDPOINT=http://appwrite/v1`,
-set in `docker-compose.dev.yml`); host tools and the mobile app use `http://localhost:8090/v1`.
+set in `docker-compose.dev.yml`); host tools and the mobile app use `http://localhost:9000/v1`.
 
 > `_APP_OPENSSL_KEY_V1` in `.env.dev` encrypts Appwrite data at rest — **never change it** after
 > the first boot or existing data becomes unreadable.
@@ -276,7 +276,7 @@ the app endpoint; port 80 is already used on this machine by another service, an
 1. Copy `frontmobile/.env.exemple` (sic) → `frontmobile/.env`.
    - Set `EXPO_PUBLIC_APPWRITE_ENDPOINT` (tunnel or localhost).
    - Set `EXPO_PUBLIC_APPWRITE_PROJECT_ID` (from Appwrite console).
-   - `EXPO_PUBLIC_API_BASE_URL`: leave empty on a physical phone (auto: Expo host LAN IP, see `frontmobile/config/config.ts`) or set `http://<LAN-IP>:3001/api`. `localhost` only works for an iOS simulator / web (on a phone it is the phone itself). The auto IP is the Metro host (`Metro: exp://<IP>:8083`), so it follows Wi-Fi changes; `expo-network` is not needed (it returns the phone IP, not the PC IP).
+   - `EXPO_PUBLIC_API_BASE_URL`: leave empty on a physical phone (auto: Expo host LAN IP, see `frontmobile/config/config.ts`) or set `http://<LAN-IP>:3003/api`. `localhost` only works for an iOS simulator / web (on a phone it is the phone itself). The auto IP is the Metro host (`Metro: exp://<IP>:8083`), so it follows Wi-Fi changes; `expo-network` is not needed (it returns the phone IP, not the PC IP).
    - **Never put API keys in `EXPO_PUBLIC_*` vars.**
 2. Rebuild the app: `cd frontmobile && eas build --platform android/ios --profile preview` (or use Xcode/Android Studio locally).
 3. Install on device.
@@ -367,15 +367,15 @@ none in production. The mobile app is not subject to CORS.
 
 ### DioteKo's Postgres
 
-Service `postgres` of `docker-compose.dev.yml`, container `dioteko-postgres`, image `postgres:18-alpine`, on the
-`dioteko-dev` project's own default network (shared with `backend-nest` and Appwrite only). Data lives in the named
-volume `postgres_data`. Dev-only credentials `postgres_user` / `postgres_password`. Databases: `dioteko_dev`
-(created by `POSTGRES_DB` on first boot) and `dioteko_test` (created by `npm run dev:up` / `db:setup`, no init
+Service `postgres` of `docker-compose.dev.yml`, container `dioteko-postgres-bitnob`, image `postgres:18-alpine`, on the
+`dioteko-dev-bitnob` project's own default network (shared with `backend-nest` and Appwrite only). Data lives in the named
+volume `postgres_data`. Dev-only credentials `postgres_user` / `postgres_password`. Databases: `dioteko_dev_bitnob`
+(created by `POSTGRES_DB` on first boot) and `dioteko_test_bitnob` (created by `npm run dev:up` / `db:setup`, no init
 service). Nothing depends on a Postgres container or Docker network from another project, so the repo runs on any
 machine with Docker.
 
 The host port is published for tools on your machine (migrations, `psql`, GUI clients) and is set by
-`DIOTEKO_PG_HOST_PORT` in the root `.env.dev` (default **5435**, chosen to avoid the 5432/5433/5434 that other
+`DIOTEKO_PG_HOST_PORT` in the root `.env.dev` (default **5442**, chosen to avoid the 5432/5433/5434 that other
 projects commonly use). If you change it, set the same value as `DB_PORT` and in `DATABASE_URL` in
 `backend-nest/.env` and `.env.test`. Inside Docker, `backend-nest` always uses `postgres:5432`.
 
@@ -384,12 +384,12 @@ projects commonly use). If you change it, set the same value as `DB_PORT` and in
 | Port | Service |
 |---|---|
 | 3000 | `frontweb/` console (`npm run dev`, or the production container) |
-| 3001 | `backend-nest` (container or `npm run start:dev`), API under `/api`, Swagger at `/api-docs` |
-| 5435 | DioteKo Postgres (`DIOTEKO_PG_HOST_PORT`) |
-| 8000 | Idswyft API (KYC, separate stack, dev only; see the KYC section above) |
-| 8086 | Idswyft dashboard (KYC, separate stack, dev only) |
-| 8090 | Appwrite console/API (dev) |
+| 3003 | `backend-nest` (container or `npm run start:dev`), API under `/api`, Swagger at `/api-docs` |
+| 5442 | DioteKo Postgres (`DIOTEKO_PG_HOST_PORT`) |
+| 8010 | Idswyft API (KYC, separate stack, dev only; see the KYC section above) |
+| 8087 | Idswyft dashboard (KYC, separate stack, dev only) |
+| 9000 | Appwrite console/API (dev) |
 
-The mobile app reaches `backend-nest` on port 3001 (`frontmobile/config/config.ts`).
+The mobile app reaches `backend-nest` on port 3003 (`frontmobile/config/config.ts`).
 
 Appwrite's MariaDB and Redis are internal to the compose network (not published).

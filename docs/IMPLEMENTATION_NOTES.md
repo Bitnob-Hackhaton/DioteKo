@@ -189,9 +189,9 @@ If `APPWRITE_ENDPOINT` or `APPWRITE_PROJECT_ID` are unset, `AppwriteService.veri
 at runtime with an empty string, causing Appwrite Client initialization to fail.
 
 **Mobile** (`frontmobile/.env`):
-- `EXPO_PUBLIC_APPWRITE_ENDPOINT` — Appwrite instance URL (e.g., `http://localhost:8090/v1` for dev, `https://appwrite.example.com/v1` for prod)
+- `EXPO_PUBLIC_APPWRITE_ENDPOINT` — Appwrite instance URL (e.g., `http://localhost:9000/v1` for dev, `https://appwrite.example.com/v1` for prod)
 - `EXPO_PUBLIC_APPWRITE_PROJECT_ID` — Appwrite project ID (same as backend)
-- `EXPO_PUBLIC_API_BASE_URL` — DioteKo backend base URL (e.g., `http://localhost:3001/api` for dev)
+- `EXPO_PUBLIC_API_BASE_URL` — DioteKo backend base URL (e.g., `http://localhost:3003/api` for dev)
 
 **Never put API keys in `EXPO_PUBLIC_*` env vars** — they are baked into the app bundle. Use server API keys only on the backend.
 
@@ -275,9 +275,9 @@ The `signInWithGoogle()` function (line 46) orchestrates the entire OAuth→JWT 
 #### Configuration
 
 **Mobile** (`frontmobile/config/config.ts`):
-- `APPWRITE_ENDPOINT` — read from `EXPO_PUBLIC_APPWRITE_ENDPOINT` env var (e.g., `http://localhost:8090/v1` for dev)
+- `APPWRITE_ENDPOINT` — read from `EXPO_PUBLIC_APPWRITE_ENDPOINT` env var (e.g., `http://localhost:9000/v1` for dev)
 - `APPWRITE_PROJECT_ID` — read from `EXPO_PUBLIC_APPWRITE_PROJECT_ID` env var
-- `API_BASE_URL` — read from `EXPO_PUBLIC_API_BASE_URL` env var (e.g., `http://localhost:3001/api` for dev)
+- `API_BASE_URL` — read from `EXPO_PUBLIC_API_BASE_URL` env var (e.g., `http://localhost:3003/api` for dev)
 - `APPWRITE_PLATFORM` — hardcoded to `'com.dioteko.app'` (must match bundle identifier in Appwrite console and app.json)
   - iOS: `frontmobile/app.json` → `"ios.bundleIdentifier": "com.dioteko.app"`
   - Android: `frontmobile/app.json` → `"android.package": "com.dioteko.app"`

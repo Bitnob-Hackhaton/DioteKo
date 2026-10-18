@@ -173,7 +173,7 @@ Voir `docs/BITNOB.md`.
 ### Appwrite: project/key setup is manual
 
 `npm run dev:up` runs a self-hosted Appwrite locally
-(`docker-compose.appwrite.yml`, host port 8090, its own MariaDB + Redis — Appwrite has no
+(`docker-compose.appwrite.yml`, host port 9000, its own MariaDB + Redis — Appwrite has no
 Postgres adapter). Remaining gaps before live end-to-end Appwrite/Google login:
 - The project, API key and Google OAuth provider must be created **once via the console** —
   `APPWRITE_PROJECT_ID` / `APPWRITE_API_KEY` in `backend-nest/.env` start empty. Steps:
@@ -183,7 +183,7 @@ Postgres adapter). Remaining gaps before live end-to-end Appwrite/Google login:
   guessed value — it must match whatever's registered in the Appwrite console project or the
   client SDK's platform check rejects the app.
 - `docs/APPWRITE_ID.md` held a plaintext Appwrite account login (email + password). It was tracked by git (commit `a88ec7c`); it is now untracked and listed in `.gitignore`, but **the password stays readable in the Git history: rotate it** (Appwrite console) and treat it as compromised. Never commit credentials; use `backend-nest/.env`.
-- Running `docker-compose up dioteko-backend-nest` runs the old image until rebuilt. `.env` must have `APPWRITE_REQUIRE_GOOGLE_IDENTITY` unset or true for real Google login (false only for E2E email/password seed user).
+- Running `docker-compose up dioteko-backend-nest-bitnob` runs the old image until rebuilt. `.env` must have `APPWRITE_REQUIRE_GOOGLE_IDENTITY` unset or true for real Google login (false only for E2E email/password seed user).
 
 ### Mobile SDK / Appwrite server version skew
 
@@ -214,7 +214,7 @@ Code commité, **jamais exécuté contre une vraie instance Idswyft avec de vrai
 - **Doublons et réexpiration :** un même document peut vérifier plusieurs comptes (aucune empreinte stockée) ; un dossier `verified` n'expire jamais.
 - **Demandes déposées avant le déploiement :** pas de contrôle au dépôt ; la porte n'agit qu'à la création de la facture (et au renvoi).
 - **Verrou d'upload en mémoire** (`KycController.uploading`) : protège un seul processus. Avec plusieurs instances, le plafond par session (`attempts`, en base) reste la seule protection.
-- **Base et conteneur de dev à mettre à jour par l'utilisateur :** la migration `1789000000000-CreateKycVerifications` est jouée sur `dioteko_test` (run, revert, run vérifiés) mais pas sur `dioteko_dev`, et l'image `backend-nest` n'est pas reconstruite, tant que l'utilisateur ne le fait pas (`npm run dev:up`).
+- **Base et conteneur de dev à mettre à jour par l'utilisateur :** la migration `1789000000000-CreateKycVerifications` est jouée sur `dioteko_test_bitnob` (run, revert, run vérifiés) mais pas sur `dioteko_dev_bitnob`, et l'image `backend-nest` n'est pas reconstruite, tant que l'utilisateur ne le fait pas (`npm run dev:up`).
 - **Autorisation CDP et région de données :** à obtenir avant toute production ; pas de Cloud Idswyft avec de vraies données tant que la région n'est pas connue.
 
 ### Relecture KYC par un agent : portée plateforme
