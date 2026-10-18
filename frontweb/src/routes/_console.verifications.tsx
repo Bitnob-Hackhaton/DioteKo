@@ -4,7 +4,14 @@ import { ChevronLeft, ChevronRight, RotateCw } from "lucide-react";
 import { Guard } from "@/components/console/Can";
 import { KycReviewDrawer } from "@/components/console/KycReviewDrawer";
 import { KycOriginBadge, KycStatusBadge } from "@/components/console/KycBadges";
-import { KYC_ORIGIN_LABELS, KYC_REASON_LABELS, KYC_STATUS_LABELS } from "@/lib/kyc-labels";
+import { KYC_ORIGIN_LABELS, KYC_REASON_LABELS, KYC_STATUS_FILTER_LABELS } from "@/lib/kyc-labels";
+import {
+  KYC_DEFAULT_STATUS,
+  KYC_LIST_ORIGINS,
+  KYC_LIST_STATUSES,
+  parseKycSearch,
+  type KycSearch,
+} from "@/lib/kyc-search";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,28 +27,14 @@ import { formatAge, formatDate } from "@/lib/format";
 import type { KycReviewOrigin, KycReviewStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type Search = {
-  status?: KycReviewStatus | undefined;
-  origin?: KycReviewOrigin | undefined;
-  page?: number | undefined;
-  id?: string | undefined;
-};
-const STATUSES = Object.keys(KYC_STATUS_LABELS) as KycReviewStatus[];
-const ORIGINS = Object.keys(KYC_ORIGIN_LABELS) as KycReviewOrigin[];
+type Search = KycSearch;
+const STATUSES = KYC_LIST_STATUSES;
+const ORIGINS = KYC_LIST_ORIGINS;
 // Par défaut : la file de travail, c'est-à-dire les dossiers qui attendent un agent.
-const DEFAULT_STATUS: KycReviewStatus = "manual_review";
+const DEFAULT_STATUS = KYC_DEFAULT_STATUS;
 
 export const Route = createFileRoute("/_console/verifications")({
-  validateSearch: (s: Record<string, unknown>): Search => ({
-    status: STATUSES.includes(s["status"] as KycReviewStatus)
-      ? (s["status"] as KycReviewStatus)
-      : undefined,
-    origin: ORIGINS.includes(s["origin"] as KycReviewOrigin)
-      ? (s["origin"] as KycReviewOrigin)
-      : undefined,
-    page: Number(s["page"]) > 1 ? Number(s["page"]) : undefined,
-    id: typeof s["id"] === "string" && s["id"] ? s["id"] : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): Search => parseKycSearch(s),
   head: () => ({
     meta: [
       { title: "Vérifications d'identité — DioteKo Console" },
@@ -97,7 +90,9 @@ function VerificationsPage() {
           <Select
             value={filters.status}
             onValueChange={(v) =>
-              setSearch({ status: v === DEFAULT_STATUS ? undefined : (v as KycReviewStatus) })
+              setSearch({
+                status: v === DEFAULT_STATUS ? undefined : (v as KycReviewStatus | "all"),
+              })
             }
           >
             <SelectTrigger id="k-status" className="h-9 w-48">
@@ -106,7 +101,7 @@ function VerificationsPage() {
             <SelectContent>
               {STATUSES.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {KYC_STATUS_LABELS[s]}
+                  {KYC_STATUS_FILTER_LABELS[s]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -174,9 +169,13 @@ function VerificationsPage() {
             </div>
           ) : items.length === 0 ? (
             <p className="py-16 text-center text-sm text-muted-foreground">
-              {filters.status === DEFAULT_STATUS && filters.origin === "all"
-                ? "Aucun dossier en attente de relecture."
-                : "Aucun dossier ne correspond à ces filtres."}
+              {filters.origin !== "all"
+                ? "Aucun dossier ne correspond à ces filtres."
+                : filters.status === DEFAULT_STATUS
+                  ? "Aucun dossier en attente de relecture."
+                  : filters.status === "all"
+                    ? "Aucun dossier de vérification d'identité pour le moment."
+                    : "Aucun dossier ne correspond à ces filtres."}
             </p>
           ) : (
             items.map((r) => (

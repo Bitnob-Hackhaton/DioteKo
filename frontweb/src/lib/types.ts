@@ -187,8 +187,11 @@ export interface AuditFilters {
 }
 
 // ---------------------------------------------------------------- KYC manual review (see docs/PLAN_KYC_MANUAL_REVIEW.md)
-/** `provider` = Idswyft a demandé une relecture ; `fallback` = contrôle automatique en échec ; `manual_only` = Idswyft désactivé. */
-export type KycReviewOrigin = "provider" | "fallback" | "manual_only";
+/**
+ * `provider` = Idswyft a demandé une relecture ; `fallback` = contrôle automatique en échec ; `manual_only` = Idswyft
+ * désactivé ; `auto` = le fournisseur a validé le dossier seul, sans agent (consultation en lecture seule).
+ */
+export type KycReviewOrigin = "provider" | "fallback" | "manual_only" | "auto";
 export type KycDocumentKind = "front" | "back" | "selfie";
 export type KycReviewStatus = "manual_review" | "verified" | "rejected";
 export type KycReviewDecision = "approve" | "reject";
@@ -205,6 +208,105 @@ export interface KycReviewSummary {
   /** Motif technique du basculement (ex. `document_unreadable`), jamais de donnée personnelle. */
   failureReason: string | null;
   createdAt: string;
+  /** Présent pour un dossier validé. */
+  verifiedAt?: string | undefined;
+}
+
+/** Champs OCR conservés par le serveur (ordre d'affichage). */
+export type KycOcrFieldKey =
+  | "full_name"
+  | "date_of_birth"
+  | "id_number"
+  | "expiry_date"
+  | "nationality"
+  | "sex"
+  | "place_of_birth"
+  | "issue_date"
+  | "issuing_country";
+
+export interface KycOcrField {
+  key: KycOcrFieldKey;
+  /** Donnée personnelle lue sur la pièce : réservée à l'agent, jamais journalisée. */
+  value: string;
+  /** 0..1, ou `null` si le prestataire n'en a pas donné pour ce champ. */
+  confidence: number | null;
+}
+
+export interface KycScore {
+  /** 0..1 */
+  score: number | null;
+  passed: boolean | null;
+  verdict: string | null;
+}
+
+/** Ce que la vérification automatique (Idswyft) a lu et comment elle a noté le dossier. */
+export interface KycAssessment {
+  version: number;
+  readAt: string;
+  /** Étape de la session chez le prestataire (`HARD_REJECTED`, `COMPLETE`...). */
+  providerStep: string | null;
+  finalResult: string | null;
+  /** Code stable du prestataire (ex. `FRONT_OCR_FAILED`). */
+  rejectionCode: string | null;
+  rejectionDetail: string | null;
+  ocr: { fields: KycOcrField[]; confidence: number | null } | null;
+  crossValidation: KycScore | null;
+  faceMatch: KycScore | null;
+  liveness: KycScore | null;
+  riskScore: number | null;
+}
+
+/**
+ * `available` = lectures disponibles ; `no_data` = le prestataire a répondu sans rien lire ; `unavailable` = rien de
+ * conservé (panne, expiré, clé changée) ; `not_run` = mode manuel, aucun contrôle automatique.
+ */
+export type KycAssessmentState = "available" | "no_data" | "unavailable" | "not_run";
+
+export interface KycAssessmentView {
+  state: KycAssessmentState;
+  assessment: KycAssessment | null;
+}
+
+export interface KycAutoAuditScore {
+  /** 0..1 */
+  score: number | null;
+  /** Minimum exigé par le fournisseur (0..1), `null` s'il ne l'a pas donné. */
+  threshold: number | null;
+  passed: boolean | null;
+}
+
+export interface KycAutoAuditCheck {
+  /** Nom du champ comparé (ex. `date_of_birth`), jamais sa valeur. */
+  name: string;
+  passed: boolean | null;
+  score: number | null;
+}
+
+/**
+ * Trace d'un dossier validé par le fournisseur seul : scores, seuils et indicateurs. Aucune photo, aucun texte lu sur la
+ * pièce, aucun nom (minimisation des données).
+ */
+export interface KycAutoAudit {
+  version: number;
+  readAt: string;
+  providerVerdict: string | null;
+  /** Fournisseur en mode bac à sable : verdict non fiable en production. `null` s'il ne l'a pas dit. */
+  isSandbox: boolean | null;
+  faceMatch: KycAutoAuditScore | null;
+  liveness: KycAutoAuditScore | null;
+  crossValidation: {
+    verdict: string | null;
+    passed: boolean | null;
+    score: number | null;
+    checks: KycAutoAuditCheck[];
+  } | null;
+  documentExpired: boolean | null;
+}
+
+/** `unavailable` = rien de conservé (dossier antérieur à la trace, rétention dépassée, clé absente ou changée). */
+export interface KycAutoAuditView {
+  state: "available" | "unavailable";
+  audit: KycAutoAudit | null;
 }
 
 export interface KycReviewDetail extends KycReviewSummary {
@@ -213,9 +315,14 @@ export interface KycReviewDetail extends KycReviewSummary {
   reviewedByName?: string | undefined;
   reviewedAt?: string | undefined;
   reviewNote?: string | undefined;
+  /** Route de détail uniquement, dossier en attente de décision ; absent de la liste. */
+  assessment?: KycAssessmentView | undefined;
+  /** Route de détail uniquement, dossier validé par le fournisseur seul (origine `auto`) ; absent de la liste. */
+  autoAudit?: KycAutoAuditView | undefined;
 }
 
 export interface KycReviewFilters {
+  /** Absent = la file de travail (« À relire ») ; `all` = tous les états. */
   status?: KycReviewStatus | "all" | undefined;
   origin?: KycReviewOrigin | "all" | undefined;
   page?: number | undefined;

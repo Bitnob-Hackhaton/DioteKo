@@ -28,6 +28,8 @@ import { formatDateTime } from "@/lib/format";
 import type { KycDocumentKind, KycReviewDecision } from "@/lib/types";
 import { KYC_REASON_LABELS } from "@/lib/kyc-labels";
 import { KycOriginBadge, KycStatusBadge } from "./KycBadges";
+import { KycAssessmentPanel } from "./KycAssessmentPanel";
+import { KycAutoAuditPanel } from "./KycAutoAuditPanel";
 
 const errMsg = (e: unknown) => (isApiError(e) ? e.message : "Erreur inattendue. Réessayez.");
 
@@ -111,6 +113,8 @@ export function KycReviewDrawer({ id, onClose }: { id: string | undefined; onClo
 
   const r = q.data;
   const reviewable = !!r && r.status === "manual_review" && can(user, "kyc.review");
+  // Validé par le fournisseur seul : consultation en lecture seule, ni photo ni décision.
+  const isAuto = r?.origin === "auto";
   const noteOk = note.trim().length >= 10;
 
   return (
@@ -119,7 +123,9 @@ export function KycReviewDrawer({ id, onClose }: { id: string | undefined; onClo
         <SheetHeader>
           <SheetTitle className="font-serif">Vérification d'identité</SheetTitle>
           <SheetDescription>
-            Comparez le document et le selfie, puis validez ou rejetez le dossier.
+            {isAuto
+              ? "Dossier validé automatiquement par le fournisseur : consultation en lecture seule."
+              : "Consultez la lecture automatique, comparez le document et le selfie, puis validez ou rejetez le dossier."}
           </SheetDescription>
         </SheetHeader>
 
@@ -152,13 +158,17 @@ export function KycReviewDrawer({ id, onClose }: { id: string | undefined; onClo
                     ["Pays émetteur", r.issuingCountry ?? "—"],
                     ["Déposé le", formatDateTime(r.createdAt)],
                     ["Tentatives", String(r.attempts)],
-                    [
-                      "Motif du renvoi en relecture",
-                      r.failureReason
-                        ? (KYC_REASON_LABELS[r.failureReason] ?? r.failureReason)
-                        : "—",
-                    ],
-                  ] as const
+                    ...(isAuto
+                      ? ([] as const)
+                      : ([
+                          [
+                            "Motif du renvoi en relecture",
+                            r.failureReason
+                              ? (KYC_REASON_LABELS[r.failureReason] ?? r.failureReason)
+                              : "—",
+                          ],
+                        ] as const)),
+                  ] as ReadonlyArray<readonly [string, string]>
                 ).map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">{k}</dt>
@@ -167,7 +177,17 @@ export function KycReviewDrawer({ id, onClose }: { id: string | undefined; onClo
                 ))}
               </dl>
 
-              {r.availableDocuments.length === 0 ? (
+              {/* Ce que la vérification automatique a lu : de quoi décider plus vite, avant de comparer les photos. */}
+              {r.status === "manual_review" && r.assessment && (
+                <KycAssessmentPanel view={r.assessment} />
+              )}
+
+              {/* Vérification automatique : scores seulement (aucune photo, aucun texte lu n'est conservé). */}
+              {isAuto && r.autoAudit && (
+                <KycAutoAuditPanel view={r.autoAudit} verifiedAt={r.verifiedAt} />
+              )}
+
+              {isAuto ? null : r.availableDocuments.length === 0 ? (
                 <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
                   Aucune pièce disponible : elles ont expiré ou n'ont pas été conservées.
                 </p>
@@ -179,7 +199,7 @@ export function KycReviewDrawer({ id, onClose }: { id: string | undefined; onClo
                 </div>
               )}
 
-              {r.status !== "manual_review" && (
+              {r.status !== "manual_review" && !isAuto && (
                 <div className="rounded-md border bg-muted/40 p-4 text-sm">
                   <p className="font-medium">
                     Dossier traité{r.reviewedByName ? ` par ${r.reviewedByName}` : ""}

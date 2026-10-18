@@ -371,7 +371,8 @@ export const api = {
         : raw<Paginated<KycReviewDetail>>(
             "GET",
             `${KYC_REVIEW}${qs({
-              status: f.status && f.status !== "all" ? f.status : undefined,
+              // Absent = la file « À relire » (défaut du serveur) ; `all` est envoyé tel quel (tous les états).
+              status: f.status,
               origin: f.origin && f.origin !== "all" ? f.origin : undefined,
               limit: REAL_PAGE_SIZE,
               offset: ((f.page ?? 1) - 1) * REAL_PAGE_SIZE,
