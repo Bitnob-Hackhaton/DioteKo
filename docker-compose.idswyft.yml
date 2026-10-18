@@ -72,6 +72,11 @@ services:
     environment:
       PORT: "3002"
       NODE_ENV: development
+    volumes:
+      # PaddleOCR downloads its ONNX models (PP-OCRv5 det/rec + dictionary, ~13 MB) from the internet at the first OCR call.
+      # Without a cache volume a recreated container has none, and offline OCR fails ("fetch failed"): every document is then
+      # rejected by Idswyft's Gate 1 ("no OCR fields could be read"). Seed it once, see docs/KYC.md.
+      - idswyft_ocr_cache:/home/nodeuser/.cache/ppu-paddle-ocr
 
   idswyft-api:
     build:
@@ -127,6 +132,7 @@ services:
       - "${IDSWYFT_DASHBOARD_HOST_PORT:-8087}:8080"
 
 volumes:
+  idswyft_ocr_cache:
   idswyft_pg_data:
   idswyft_migrations:
   idswyft_uploads:
