@@ -1,5 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useGlobalContext } from '@/lib/global-provider';
 import {
   getCertificateTypes,
   getMyCertificateRequestStats,
@@ -38,6 +39,8 @@ interface Options {
 // Charge "mes demandes" depuis Nest, filtrees par le serveur. Les types ne servent qu'aux libelles : s'ils echouent,
 // on affiche l'identifiant du type plutot que de masquer les demandes.
 export const useMyCertificateRequests = ({ limit = 20, withStats = false }: Options = {}) => {
+  // Pas de session = pas d'appel : l'ecran peut se monter avant la redirection vers la connexion (ou pendant la restauration de la session).
+  const { isLoggedIn } = useGlobalContext();
   const [requests, setRequests] = useState<CertificateRequestView[]>([]);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<CertificateRequestStats | null>(null);
@@ -48,6 +51,7 @@ export const useMyCertificateRequests = ({ limit = 20, withStats = false }: Opti
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    if (!isLoggedIn) return;
     let cancelled = false;
     (async () => {
       try {
@@ -77,7 +81,7 @@ export const useMyCertificateRequests = ({ limit = 20, withStats = false }: Opti
     return () => {
       cancelled = true;
     };
-  }, [filter, limit, withStats, reloadKey]);
+  }, [filter, limit, withStats, reloadKey, isLoggedIn]);
 
   // Au retour sur l'ecran (apres un paiement, une acceptation...) la liste se met a jour sans spinner.
   const firstFocus = useRef(true);
