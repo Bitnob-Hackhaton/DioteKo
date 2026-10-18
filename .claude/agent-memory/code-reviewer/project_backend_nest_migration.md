@@ -1,11 +1,11 @@
 ---
 name: backend-nest-migration
-description: backend-nest/ (NestJS + TypeORM + Postgres) is the running backend (port 3001, prefix /api), delivered in numbered Increments; Bitnob fiat payouts live here
+description: backend-nest/ (NestJS + TypeORM + Postgres) is the running backend (port 3003, prefix /api), delivered in numbered Increments; Bitnob fiat payouts live here
 metadata:
   type: project
 ---
 
-`backend-nest/` is the running backend (port 3001, prefix `/api`).
+`backend-nest/` is the running backend (port 3003, prefix `/api`).
 
 **Why:** the architecture is a modular NestJS backend with DID + Verifiable
 Credentials and Bitnob as the payment rail (see CLAUDE.md §0).

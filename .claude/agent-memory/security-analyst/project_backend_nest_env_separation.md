@@ -18,7 +18,7 @@ and `.gitignore` negations. Verdict: FIX-THEN-SHIP.
 throws. `docker-compose.prod.yml` forces `NODE_ENV=${NODE_ENV:-production}`.
 Dev values only leak into prod if a human actively writes them into `.env.prod`
 or the root prod env — not via a silent fallback. `configuration.ts` `|| 'localhost'`
-/ `|| 'dioteko_dev'` fallbacks are unreachable for the app (validation runs first).
+/ `|| 'dioteko_dev_bitnob'` fallbacks are unreachable for the app (validation runs first).
 
 **BLOCKING conditions:**
 1. `.dockerignore` only excludes `.env` — `COPY . .` in the Dockerfile bakes any
@@ -33,7 +33,7 @@ or the root prod env — not via a silent fallback. `configuration.ts` `|| 'loca
 
 **NON-BLOCKING / should-fix:**
 - `data-source.ts` (runs outside Nest, no validation): `DB_HOST` -> `localhost`,
-  `DB_NAME` -> `dioteko_dev`, creds -> `postgres/postgres` when env unset.
+  `DB_NAME` -> `dioteko_dev_bitnob`, creds -> `postgres/postgres` when env unset.
   `migration:revert` against the wrong DB is destructive. Fail closed when
   `DB_NAME` unset.
 - `seed.ts` `dotenv.config()` is placed AFTER `import { AppModule }` (CommonJS:

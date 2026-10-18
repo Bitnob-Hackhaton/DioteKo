@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-`backend-nest/` is the NestJS + TypeORM + PostgreSQL backend (port 3001, prefix `/api`). It is
+`backend-nest/` is the NestJS + TypeORM + PostgreSQL backend (port 3003, prefix `/api`). It is
 the "NestJS + DID + Verifiable Credentials" target from CLAUDE.md.
 
 **Why this matters for security review:** `backend-nest/` enforces access control server-side:
