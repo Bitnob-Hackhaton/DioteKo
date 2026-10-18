@@ -27,7 +27,7 @@ import type {
 } from "./types";
 
 const BASE =
-  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? "http://localhost:3001/api";
+  (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? "http://localhost:3003/api";
 const RT_KEY = "dioteko.rt";
 
 // Access token lives in memory only.

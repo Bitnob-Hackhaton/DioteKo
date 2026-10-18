@@ -1,6 +1,6 @@
 # DioteKo Console
 
-Console web pour le personnel des organisations émettrices (mairies, centres d'état civil, ministères). Les citoyens utilisent l'application mobile (`frontmobile/`). L'API est `backend-nest/` (préfixe `/api`, port 3001).
+Console web pour le personnel des organisations émettrices (mairies, centres d'état civil, ministères). Les citoyens utilisent l'application mobile (`frontmobile/`). L'API est `backend-nest/` (préfixe `/api`, port 3003).
 
 Pile (`package.json`) : TanStack Start et TanStack Router (React 19), Vite 8, Tailwind 4, composants shadcn/ui (Radix), TanStack Query, serveur Node via Nitro.
 
@@ -39,7 +39,7 @@ Les variables `VITE_*` sont figées au build : relancer `npm run build` après u
 
 | Variable | Rôle | Défaut |
 |---|---|---|
-| `VITE_API_BASE_URL` | URL de l'API Nest | `http://localhost:3001/api` |
+| `VITE_API_BASE_URL` | URL de l'API Nest | `http://localhost:3003/api` |
 | `VITE_USE_MOCKS` | `true` pour travailler sans backend (données simulées) | `false` |
 | `VITE_ENV` | `production` ou `sandbox` (affiche le bandeau d'environnement) | `sandbox` |
 
