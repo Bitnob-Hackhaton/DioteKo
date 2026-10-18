@@ -286,6 +286,7 @@ the app endpoint; port 80 is already used on this machine by another service, an
 7. On success, app stores token and shows logged-in screen.
 
 **Common issues:**
+- **Appwrite `400 general_argument_invalid` — "Invalid `success` param: URL host must be one of: …":** the app's deep-link host is not a registered platform of the Appwrite project. With Expo Go the redirect is `exp://<LAN-IP>:8082/--/auth/google/callback`, so add a **Web platform** (Appwrite console → project → Overview → Integrations → Add platform → Web) with hostname = the LAN IP, **no port** (e.g. `192.168.1.69`). In local dev you can use `*` (any host) so a changing LAN IP never breaks login — never in production; otherwise re-add the platform whenever the PC's LAN IP changes. A fresh Appwrite instance has no platforms, so redo this after recreating the project.
 - **"redirect_uri_mismatch" from Google:** The redirect URI in Google Cloud Console doesn't match what Appwrite is requesting. Check:
   - Appwrite console Google provider settings → copy exact callback URI shown.
   - Google Cloud Console → OAuth 2.0 credentials → authorized redirect URIs → add the callback URI exactly.
