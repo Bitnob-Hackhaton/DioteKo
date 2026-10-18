@@ -259,10 +259,10 @@ Adding `exp://…` to Google fails ("must end with a public top-level domain") a
 **Why a plain local setup fails (measured against the local Appwrite 1.5.4):** Appwrite builds the callback from the request's host name and **drops the
 port**. The same login request produced `redirect_uri=http://localhost/v1/…` (from `localhost:8090`), `http://192.168.1.69/v1/…` (from your LAN IP — rejected by Google,
 which does not accept IP addresses) and `https://<tunnel-host>/v1/…` (from an HTTPS tunnel — valid). Also, a phone's `localhost` is the phone itself, so
-`EXPO_PUBLIC_APPWRITE_ENDPOINT=http://localhost:8090/v1` cannot work on a physical device. Use an HTTPS tunnel:
+`EXPO_PUBLIC_APPWRITE_ENDPOINT=http://localhost:9000/v1` cannot work on a physical device. Use an HTTPS tunnel:
 
 **HTTPS tunnel (recommended; works for Android and iOS):**
-- `ngrok http 8090` (or `cloudflared tunnel --url http://localhost:8090`) → `https://xxxxx.ngrok-free.app`. A free ngrok account gets one static domain, so the URL does not change at each restart.
+- `npm run tunnel` (repo root) asks which tunnels to open and starts them as **Docker containers** (`dioteko-ngrok-appwrite-bitnob`, `dioteko-ngrok-backend-bitnob`, compose profile `tunnel`, never started by `dev:up`; the stack must be up first). `npm run tunnel:appwrite` / `tunnel:backend` skip the questions; `npm run tunnel:logs` follows their logs (also visible in Docker Desktop), `tunnel:ps` lists them, the ngrok inspector shows live requests at <http://localhost:4041> (Appwrite) and <http://localhost:4042> (backend), `tunnel:down` removes them (`dev:down` removes them too). Each reads its own `NGROK_<APPWRITE|BACKEND>_AUTHTOKEN` and `_DOMAIN` from `.env.dev`; the script prints the values to set below (Appwrite) or the Bitnob webhook URL (backend). A free ngrok account gets one static domain and one agent session, so give each tunnel its **own** ngrok account.
 - Google Cloud → OAuth client → **Authorized redirect URIs**: `https://xxxxx.ngrok-free.app/v1/account/sessions/oauth2/callback/google/<PROJECT_ID>` (remove any `exp://` entry).
 - `frontmobile/.env`: `EXPO_PUBLIC_APPWRITE_ENDPOINT=https://xxxxx.ngrok-free.app/v1`, then restart with `npx expo start --clear` (the `EXPO_PUBLIC_*` values are inlined at bundle time).
 - The free ngrok tier can show a "Visit Site" warning page to browsers; confirm it once, or use a Cloudflare tunnel.
