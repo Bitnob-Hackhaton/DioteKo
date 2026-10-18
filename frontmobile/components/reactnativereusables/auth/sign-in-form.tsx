@@ -20,6 +20,9 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useGlobalContext } from '@/lib/global-provider';
 import { useAppContext } from '@/Provider/AppContext';
+import { signInWithEmail } from '@/services/emailAuth';
+import { ActivityIndicator } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 export function SignInForm() {
   const colorScheme = useColorScheme();
@@ -28,8 +31,32 @@ export function SignInForm() {
   const { setUserData } = useAppContext();
   const { refetch } = useGlobalContext();
 
-  function onSubmit() {
-    // TODO: Submit form and navigate to protected screen if successful
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  async function onSubmit() {
+    if (isSubmitting) return;
+
+    if (!email.trim() || !password) {
+      Toast.show({ type: 'error', text1: 'Entre ton email et ton mot de passe' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await signInWithEmail({ email, password });
+      // Le GlobalProvider relit la session stockee : la navigation vers l'app suit l'etat connecte.
+      await refetch();
+    } catch (error) {
+      if (__DEV__) console.warn('[EmailAuth] login failure:', error instanceof Error ? error.message : error);
+      Toast.show({
+        type: 'error',
+        text1: error instanceof Error ? error.message : 'Connexion impossible',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -47,6 +74,8 @@ export function SignInForm() {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                value={email}
+                onChangeText={setEmail}
                 placeholder="m@example.com"
                 keyboardType="email-address"
                 autoComplete="email"
@@ -70,13 +99,25 @@ export function SignInForm() {
               </View>
               <Input
                 id="password"
+                value={password}
+                onChangeText={setPassword}
+                autoComplete="current-password"
+                textContentType="password"
+                autoCapitalize="none"
                 secureTextEntry
                 returnKeyType="send"
                 onSubmitEditing={onSubmit}
               />
             </View>
-            <Button style={{ width: '100%', marginTop: 4, backgroundColor: colors['brand.primary'] }} onPress={onSubmit}>
-              <Text style={{ color: colors['brand.primary.on'], fontWeight: '600' }}>Continue</Text>
+            <Button
+              style={{ width: '100%', marginTop: 4, backgroundColor: colors['brand.primary'], opacity: isSubmitting ? 0.7 : 1 }}
+              disabled={isSubmitting}
+              onPress={onSubmit}>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color={colors['brand.primary.on']} />
+              ) : (
+                <Text style={{ color: colors['brand.primary.on'], fontWeight: '600' }}>Continue</Text>
+              )}
             </Button>
           </View>
           <Text style={{ textAlign: 'center', fontSize: 14, color: colors['text.muted'], marginTop: 8 }}>

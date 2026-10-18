@@ -15,8 +15,16 @@ import { Text } from '../components/ui/text';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useGlobalContext } from '@/lib/global-provider';
+import { registerWithEmail } from '@/services/emailAuth';
 import * as React from 'react';
-import { TextInput, View } from 'react-native';
+import { ActivityIndicator, TextInput, View } from 'react-native';
+import Toast from 'react-native-toast-message';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_MIN_LENGTH = 8;
+// Le backend refuse un mot de passe de plus de 72 octets (limite de bcrypt).
+const PASSWORD_MAX_BYTES = 72;
 
 export function SignUpForm() {
   const lastNameInputRef = React.useRef<TextInput>(null);
@@ -25,6 +33,13 @@ export function SignUpForm() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const { refetch } = useGlobalContext();
+
+  const [firstName, setFirstName] = React.useState('');
+  const [lastName, setLastName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   function onFirstNameSubmitEditing() {
     lastNameInputRef.current?.focus();
@@ -38,8 +53,37 @@ export function SignUpForm() {
     passwordInputRef.current?.focus();
   }
 
-  function onSubmit() {
-    // TODO: Submit form and navigate to protected screen if successful
+  async function onSubmit() {
+    if (isSubmitting) return;
+
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      Toast.show({ type: 'error', text1: 'Entre une adresse email valide' });
+      return;
+    }
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      Toast.show({ type: 'error', text1: `Le mot de passe doit faire au moins ${PASSWORD_MIN_LENGTH} caracteres` });
+      return;
+    }
+    if (new TextEncoder().encode(password).length > PASSWORD_MAX_BYTES) {
+      Toast.show({ type: 'error', text1: 'Mot de passe trop long' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await registerWithEmail({ email, password, displayName: `${firstName} ${lastName}` });
+      Toast.show({ type: 'success', text1: 'Compte cree' });
+      // Le GlobalProvider relit la session stockee : la navigation vers l'app suit l'etat connecte.
+      await refetch();
+    } catch (error) {
+      if (__DEV__) console.warn('[EmailAuth] register failure:', error instanceof Error ? error.message : error);
+      Toast.show({
+        type: 'error',
+        text1: error instanceof Error ? error.message : 'Impossible de creer le compte',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -57,6 +101,8 @@ export function SignUpForm() {
               <Label htmlFor="firstName">Prénom</Label>
               <Input
                 id="firstName"
+                value={firstName}
+                onChangeText={setFirstName}
                 placeholder="Awa"
                 autoComplete="given-name"
                 textContentType="givenName"
@@ -71,6 +117,8 @@ export function SignUpForm() {
               <Input
                 ref={lastNameInputRef}
                 id="lastName"
+                value={lastName}
+                onChangeText={setLastName}
                 placeholder="Diop"
                 autoComplete="family-name"
                 textContentType="familyName"
@@ -85,6 +133,8 @@ export function SignUpForm() {
               <Input
                 ref={emailInputRef}
                 id="email"
+                value={email}
+                onChangeText={setEmail}
                 placeholder="m@example.com"
                 keyboardType="email-address"
                 autoComplete="email"
@@ -101,13 +151,26 @@ export function SignUpForm() {
               <Input
                 ref={passwordInputRef}
                 id="password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="8 caracteres minimum"
+                autoComplete="new-password"
+                textContentType="newPassword"
+                autoCapitalize="none"
                 secureTextEntry
                 returnKeyType="send"
                 onSubmitEditing={onSubmit}
               />
             </View>
-            <Button style={{ width: '100%', marginTop: 4, backgroundColor: colors['brand.primary'] }} onPress={onSubmit}>
-              <Text style={{ color: colors['brand.primary.on'], fontWeight: '600' }}>Continue</Text>
+            <Button
+              style={{ width: '100%', marginTop: 4, backgroundColor: colors['brand.primary'], opacity: isSubmitting ? 0.7 : 1 }}
+              disabled={isSubmitting}
+              onPress={onSubmit}>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color={colors['brand.primary.on']} />
+              ) : (
+                <Text style={{ color: colors['brand.primary.on'], fontWeight: '600' }}>Continue</Text>
+              )}
             </Button>
           </View>
           <Text style={{ textAlign: 'center', fontSize: 14, color: colors['text.muted'], marginTop: 8 }}>
@@ -126,7 +189,7 @@ export function SignUpForm() {
             <Text style={{ color: colors['text.muted'], paddingHorizontal: 12, fontSize: 14 }}>or</Text>
             <Separator style={{ flex: 1 }} />
           </View>
-          <SocialConnections />
+          <SocialConnections onGoogleSuccess={() => refetch()} />
         </CardContent>
       </Card>
     </View>
